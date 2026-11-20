@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Leads y Cotizaciones</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+    <!-- Indicador de Carga / Estado -->
+    <div id="loading-banner" class="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white text-center py-2 text-sm font-medium shadow-md hidden">
+        <i class="fa-solid fa-spinner fa-spin mr-2"></i> <span id="loading-text">Sincronizando con Google Sheets...</span>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- Encabezado -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-chart-line text-blue-600 mr-2"></i> CRM Leads & Cotizaciones</h1>
+                <p class="text-sm text-gray-500">Gestión centralizada con persistencia directa en Google Sheets</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex gap-3">
+                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition flex items-center">
+                    <i class="fa-solid fa-plus mr-2"></i> Nuevo Lead
+                </button>
+                <button onclick="loadData()" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold shadow transition">
+                    <i class="fa-solid fa-rotate mr-1"></i> Actualizar
+                </button>
+            </div>
+        </header>
+
+        <!-- Pestañas de Navegación -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <button onclick="switchTab('leads')" id="tab-btn-leads" class="py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold text-sm focus:outline-none">📋 Leads y Tabla</button>
+            <button onclick="switchTab('embudo')" id="tab-btn-embudo" class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-semibold text-sm focus:outline-none">📊 Resumen del Embudo</button>
+        </div>
+
+        <!-- VISTA 1: LEADS Y TABLA -->
+        <div id="view-leads" class="space-y-6">
+            
+            <!-- Tarjetas KPI -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-gray-500 font-medium">Leads Totales</p>
+                    <p id="kpi-total" class="text-xl font-bold text-gray-900 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-blue-600 font-medium">Abiertos</p>
+                    <p id="kpi-abiertos" class="text-xl font-bold text-blue-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-green-600 font-medium">Ganados</p>
+                    <p id="kpi-ganados" class="text-xl font-bold text-green-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-red-600 font-medium">Perdidos</p>
+                    <p id="kpi-perdidos" class="text-xl font-bold text-red-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-pink-600 font-medium">Sin Vendedor</p>
+                    <p id="kpi-sin-vendedor" class="text-xl font-bold text-pink-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-emerald-600 font-medium">Monto Ganado MXN</p>
+                    <p id="kpi-monto-ganado" class="text-lg font-bold text-emerald-600 mt-1">$0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-xs text-amber-600 font-medium">En Juego MXN</p>
+                    <p id="kpi-en-juego" class="text-lg font-bold text-amber-600 mt-1">$0</p>
+                </div>
+            </div>
+
+            <!-- Filtros de Búsqueda -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Buscar Empresa / Cliente</label>
+                    <input type="text" id="filter-search" oninput="renderTable()" placeholder="Escribe para buscar..." class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Filtrar por Vendedor</label>
+                    <select id="filter-vendedor" onchange="renderTable()" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="">Todos los vendedores</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Filtrar por Estatus</label>
+                    <select id="filter-estatus" onchange="renderTable()" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="">Todos los estatus</option>
+                        <option value="Abierto">Abierto</option>
+                        <option value="Ganado">Ganado</option>
+                        <option value="Perdido">Perdido</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="clearFilters()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-semibold py-2 rounded-lg transition">Limpiar Filtros</button>
+                </div>
+            </div>
+
+            <!-- Tabla de Leads -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                <th class="p-3">No.</th>
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Empresa / Cliente</th>
+                                <th class="p-3">Origen</th>
+                                <th class="p-3">Solicitud</th>
+                                <th class="p-3">Cotización</th>
+                                <th class="p-3">Vendedor</th>
+                                <th class="p-3">Estatus</th>
+                                <th class="p-3">Monto MXN</th>
+                                <th class="p-3">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body" class="divide-y divide-gray-200">
+                            <!-- Inyectado por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 2: RESUMEN DEL EMBUDO -->
+        <div id="view-embudo" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Tabla 1: Origen -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-900 mb-4 text-sm"><i class="fa-solid fa-bullseye text-blue-600 mr-2"></i> Leads por Origen</h3>
+                    <div id="table-origen-container" class="overflow-x-auto"></div>
+                </div>
+                <!-- Tabla 2: Vendedor -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-900 mb-4 text-sm"><i class="fa-solid fa-user-tie text-blue-600 mr-2"></i> Leads por Vendedor</h3>
+                    <div id="table-vendedor-container" class="overflow-x-auto"></div>
+                </div>
+                <!-- Tabla 3: Solicitud -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-900 mb-4 text-sm"><i class="fa-solid fa-file-invoice text-blue-600 mr-2"></i> Leads por Solicitud</h3>
+                    <div id="table-solicitud-container" class="overflow-x-auto"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE FORMULARIO DE LEAD -->
+    <div id="lead-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+                <h3 id="modal-title" class="font-bold text-lg text-gray-900">Registrar Nuevo Lead</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="lead-form" onsubmit="saveLead(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <input type="hidden" id="form-no">
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Fecha</label>
+                    <input type="date" id="form-fecha" required class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Origen (Etiqueta)</label>
+                    <select id="form-etiqueta" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Empresa</label>
+                    <input type="text" id="form-empresa" required placeholder="Ej. Construcciones Metálicas" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Nombre del cliente</label>
+                    <input type="text" id="form-nombre" required placeholder="Ej. Grecia Pérez" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Estado</label>
+                    <input type="text" id="form-estado" placeholder="Ej. Hidalgo" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Teléfono</label>
+                    <input type="text" id="form-telefono" placeholder="Ej. 55 1933 9404" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">E-mail</label>
+                    <input type="email" id="form-email" placeholder="correo@empresa.com" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Solicitud</label>
+                    <select id="form-solicitud" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Capacidad</label>
+                    <input type="text" id="form-capacidad" placeholder="Ej. 100, 500, 1000KW" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1"># Cotización</label>
+                    <input type="text" id="form-cotizacion" placeholder="Ej. BOE0001" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Vendedor asignado</label>
+                    <select id="form-vendedor" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Estatus</label>
+                    <select id="form-estatus" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Abierto">Abierto</option>
+                        <option value="Ganado">Ganado</option>
+                        <option value="Perdido">Perdido</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Último seguimiento</label>
+                    <input type="date" id="form-ultimo-seguimiento" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Monto MXN (antes de IVA)</label>
+                    <input type="number" step="any" id="form-monto-mxn" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Monto USD (antes de IVA)</label>
+                    <input type="number" step="any" id="form-monto-usd" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block font-medium text-gray-700 mb-1">Observaciones y seguimiento</label>
+                    <textarea id="form-observaciones" rows="3" placeholder="Detalles o bitácora..." class="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <button type="button" onclick="closeModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold shadow">Guardar Lead</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script de Conexión y Lógica -->
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbyH6XsFm9512qFeViEdXsXe7MZQh7yZum9dnQCoIgI5iq8io9vEzf6XWVLPXbtjW6gV/exec"; // Reemplazar con tu URL de Apps Script desplegada
+        let globalData = { leads: [], listas: { origenes: [], solicitudes: [], estatus: [], vendedores: [] } };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadData();
+        });
+
+        function showLoading(text) {
+            document.getElementById("loading-text").innerText = text;
+            document.getElementById("loading-banner").classList.remove("hidden");
+        }
+
+        function hideLoading() {
+            document.getElementById("loading-banner").classList.add("hidden");
+        }
+
+        function switchTab(tab) {
+            if (tab === 'leads') {
+                document.getElementById('view-leads').classList.remove('hidden');
+                document.getElementById('view-embudo').classList.add('hidden');
+                document.getElementById('tab-btn-leads').className = "py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold text-sm focus:outline-none";
+                document.getElementById('tab-btn-embudo').className = "py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-semibold text-sm focus:outline-none";
+            } else {
+                document.getElementById('view-leads').classList.add('hidden');
+                document.getElementById('view-embudo').classList.remove('hidden');
+                document.getElementById('tab-btn-embudo').className = "py-2 px-4 border-b-2 border-blue-600 text-blue-600 font-semibold text-sm focus:outline-none";
+                document.getElementById('tab-btn-leads').className = "py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-semibold text-sm focus:outline-none";
+                renderEmbudo();
+            }
+        }
+
+        async function loadData() {
+            showLoading("Cargando datos desde Google Sheets...");
+            try {
+                let response = await fetch(API_URL);
+                let result = await response.json();
+                if (result.status === "success") {
+                    globalData = result.data;
+                    populateDropdowns();
+                    renderTable();
+                    updateKPIs();
+                } else {
+                    alert("Error al cargar: " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("No se pudo conectar con Google Sheets. Verifica la URL de la Web App.");
+            }
+            hideLoading();
+        }
+
+        function populateDropdowns() {
+            // Llenar filtros
+            let filterV = document.getElementById("filter-vendedor");
+            filterV.innerHTML = '<option value="">Todos los vendedores</option>';
+            globalData.listas.vendedores.forEach(v => {
+                filterV.innerHTML += `<option value="${v}">${v}</option>`;
+            });
+
+            // Llenar formulario
+            let fOri = document.getElementById("form-etiqueta");
+            fOri.innerHTML = "";
+            globalData.listas.origenes.forEach(o => fOri.innerHTML += `<option value="${o}">${o}</option>`);
+
+            let fSol = document.getElementById("form-solicitud");
+            fSol.innerHTML = "";
+            globalData.listas.solicitudes.forEach(s => fSol.innerHTML += `<option value="${s}">${s}</option>`);
+
+            let fVen = document.getElementById("form-vendedor");
+            fVen.innerHTML = "";
+            globalData.listas.vendedores.forEach(v => fVen.innerHTML += `<option value="${v}">${v}</option>`);
+        }
+
+        function renderTable() {
+            let tbody = document.getElementById("leads-table-body");
+            tbody.innerHTML = "";
+
+            let search = document.getElementById("filter-search").value.toLowerCase();
+            let fVendedor = document.getElementById("filter-vendedor").value;
+            let fEstatus = document.getElementById("filter-estatus").value;
+
+            let filtered = globalData.leads.filter(l => {
+                let matchSearch = (l.empresa + " " + l.nombre_cliente + " " + l.cotizacion).toLowerCase().includes(search);
+                let matchVendedor = fVendedor === "" || l.vendedor === fVendedor;
+                let matchEstatus = fEstatus === "" || l.estatus === fEstatus;
+                return matchSearch && matchVendedor && matchEstatus;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="p-4 text-center text-gray-500">No se encontraron registros.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(l => {
+                let sinVendedor = !l.vendedor || l.vendedor === "Sin información" || l.vendedor.trim() === "";
+                let rowBg = sinVendedor ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
+
+                tbody.innerHTML += `
+                    <tr class="${rowBg} transition">
+                        <td class="p-3 font-medium">${l.no}</td>
+                        <td class="p-3">${l.fecha}</td>
+                        <td class="p-3">
+                            <div class="font-bold text-gray-900">${l.empresa || 'S/N'}</div>
+                            <div class="text-gray-500">${l.nombre_cliente || ''}</div>
+                        </td>
+                        <td class="p-3">${l.etiqueta}</td>
+                        <td class="p-3">${l.solicitud}</td>
+                        <td class="p-3 font-mono">${l.cotizacion || '-'}</td>
+                        <td class="p-3 font-semibold ${sinVendedor ? 'text-red-600' : 'text-gray-700'}">${l.vendedor || 'Sin asignar'}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${l.estatus === 'Ganado' ? 'bg-green-100 text-green-800' : l.estatus === 'Perdido' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}">
+                                ${l.estatus}
+                            </span>
+                        </td>
+                        <td class="p-3 font-medium">$${Number(l.monto_mxn).toLocaleString()}</td>
+                        <td class="p-3">
+                            <button onclick="editLead(${l.no})" class="text-blue-600 hover:text-blue-800 font-semibold"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function updateKPIs() {
+            let leads = globalData.leads;
+            document.getElementById("kpi-total").innerText = leads.length;
+            
+            let abiertos = leads.filter(l => l.estatus === "Abierto").length;
+            let ganados = leads.filter(l => l.estatus === "Ganado").length;
+            let perdidos = leads.filter(l => l.estatus === "Perdido").length;
+            let sinVendedor = leads.filter(l => !l.vendedor || l.vendedor === "Sin información" || l.vendedor.trim() === "").length;
+
+            let montoGanado = leads.filter(l => l.estatus === "Ganado").reduce((acc, l) => acc + Number(l.monto_mxn || 0), 0);
+            let enJuego = leads.filter(l => l.estatus === "Abierto").reduce((acc, l) => acc + Number(l.monto_mxn || 0), 0);
+
+            document.getElementById("kpi-abiertos").innerText = abiertos;
+            document.getElementById("kpi-ganados").innerText = ganados;
+            document.getElementById("kpi-perdidos").innerText = perdidos;
+            document.getElementById("kpi-sin-vendedor").innerText = sinVendedor;
+            document.getElementById("kpi-monto-ganado").innerText = "$" + montoGanado.toLocaleString();
+            document.getElementById("kpi-en-juego").innerText = "$" + enJuego.toLocaleString();
+        }
+
+        function openModal(lead = null) {
+            document.getElementById("lead-modal").classList.remove("hidden");
+            if (lead) {
+                document.getElementById("modal-title").innerText = `Editar Lead #${lead.no}`;
+                document.getElementById("form-no").value = lead.no;
+                document.getElementById("form-fecha").value = lead.fecha || new Date().toISOString().split('T')[0];
+                document.getElementById("form-etiqueta").value = lead.etiqueta;
+                document.getElementById("form-empresa").value = lead.empresa;
+                document.getElementById("form-nombre").value = lead.nombre_cliente;
+                document.getElementById("form-estado").value = lead.estado;
+                document.getElementById("form-telefono").value = lead.telefono;
+                document.getElementById("form-email").value = lead.email;
+                document.getElementById("form-solicitud").value = lead.solicitud;
+                document.getElementById("form-capacidad").value = lead.capacidad;
+                document.getElementById("form-cotizacion").value = lead.cotizacion;
+                document.getElementById("form-vendedor").value = lead.vendedor;
+                document.getElementById("form-estatus").value = lead.estatus;
+                document.getElementById("form-ultimo-seguimiento").value = lead.ultimo_seguimiento;
+                document.getElementById("form-monto-mxn").value = lead.monto_mxn;
+                document.getElementById("form-monto-usd").value = lead.monto_usd;
+                document.getElementById("form-observaciones").value = lead.observaciones;
+            } else {
+                document.getElementById("modal-title").innerText = "Registrar Nuevo Lead";
+                document.getElementById("lead-form").reset();
+                document.getElementById("form-no").value = "";
+                document.getElementById("form-fecha").value = new Date().toISOString().split('T')[0];
+            }
+        }
+
+        function closeModal() {
+            document.getElementById("lead-modal").classList.add("hidden");
+        }
+
+        function editLead(no) {
+            let lead = globalData.leads.find(l => Number(l.no) === Number(no));
+            if (lead) openModal(lead);
+        }
+
+        async function saveLead(event) {
+            event.preventDefault();
+            showLoading("Guardando en Google Sheets...");
+
+            let leadData = {
+                no: document.getElementById("form-no").value,
+                fecha: document.getElementById("form-fecha").value,
+                etiqueta: document.getElementById("form-etiqueta").value,
+                empresa: document.getElementById("form-empresa").value,
+                nombre_cliente: document.getElementById("form-nombre").value,
+                estado: document.getElementById("form-estado").value,
+                telefono: document.getElementById("form-telefono").value,
+                email: document.getElementById("form-email").value,
+                solicitud: document.getElementById("form-solicitud").value,
+                capacidad: document.getElementById("form-capacidad").value,
+                cotizacion: document.getElementById("form-cotizacion").value,
+                vendedor: document.getElementById("form-vendedor").value,
+                estatus: document.getElementById("form-estatus").value,
+                ultimo_seguimiento: document.getElementById("form-ultimo-seguimiento").value,
+                monto_mxn: document.getElementById("form-monto-mxn").value,
+                monto_usd: document.getElementById("form-monto-usd").value,
+                observaciones: document.getElementById("form-observaciones").value
+            };
+
+            try {
+                let response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "saveLead", lead: leadData })
+                });
+                let result = await response.json();
+                if (result.status === "success") {
+                    closeModal();
+                    await loadData();
+                } else {
+                    alert("Error al guardar: " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de red al intentar guardar.");
+            }
+            hideLoading();
+        }
+
+        function renderEmbudo() {
+            // 1. Origen
+            let origenMap = {};
+            globalData.listas.origenes.forEach(o => origenMap[o] = { total: 0, abiertos: 0, ganados: 0, perdidos: 0, monto: 0 });
+            
+            globalData.leads.forEach(l => {
+                let ori = l.etiqueta || "Sin origen";
+                if (!origenMap[ori]) origenMap[ori] = { total: 0, abiertos: 0, ganados: 0, perdidos: 0, monto: 0 };
+                origenMap[ori].total++;
+                if (l.estatus === 'Abierto') origenMap[ori].abiertos++;
+                if (l.estatus === 'Ganado') { origenMap[ori].ganados++; origenMap[ori].monto += Number(l.monto_mxn || 0); }
+                if (l.estatus === 'Perdido') origenMap[ori].perdidos++;
+            });
+
+            let htmlOrigen = `<table class="w-full text-xs text-left border-collapse"><thead><tr class="bg-gray-100 border-b"><th class="p-2">Origen</th><th class="p-2">Leads</th><th class="p-2">Ganados</th><th class="p-2">Monto MXN</th></tr></thead><tbody>`;
+            for (let [k, v] of Object.entries(origenMap)) {
+                if (v.total > 0) {
+                    htmlOrigen += `<tr class="border-b"><td class="p-2 font-medium">${k}</td><td class="p-2">${v.total}</td><td class="p-2">${v.ganados}</td><td class="p-2">$${v.monto.toLocaleString()}</td></tr>`;
+                }
+            }
+            htmlOrigen += `</tbody></table>`;
+            document.getElementById("table-origen-container").innerHTML = htmlOrigen;
+
+            // 2. Vendedor
+            let vendMap = {};
+            globalData.listas.vendedores.forEach(v => vendMap[v] = { total: 0, ganados: 0, monto: 0 });
+            vendMap["Sin asignar"] = { total: 0, ganados: 0, monto: 0 };
+
+            globalData.leads.forEach(l => {
+                let ven = l.vendedor && l.vendedor !== "Sin información" ? l.vendedor : "Sin asignar";
+                if (!vendMap[ven]) vendMap[ven] = { total: 0, ganados: 0, monto: 0 };
+                vendMap[ven].total++;
+                if (l.estatus === 'Ganado') { vendMap[ven].ganados++; vendMap[ven].monto += Number(l.monto_mxn || 0); }
+            });
+
+            let htmlVend = `<table class="w-full text-xs text-left border-collapse"><thead><tr class="bg-gray-100 border-b"><th class="p-2">Vendedor</th><th class="p-2">Leads</th><th class="p-2">Ganados</th><th class="p-2">Monto MXN</th></tr></thead><tbody>`;
+            for (let [k, v] of Object.entries(vendMap)) {
+                if (v.total > 0 || k !== "Sin asignar") {
+                    htmlVend += `<tr class="border-b"><td class="p-2 font-medium">${k}</td><td class="p-2">${v.total}</td><td class="p-2">${v.ganados}</td><td class="p-2">$${v.monto.toLocaleString()}</td></tr>`;
+                }
+            }
+            htmlVend += `</tbody></table>`;
+            document.getElementById("table-vendedor-container").innerHTML = htmlVend;
+
+            // 3. Solicitud
+            let solMap = {};
+            globalData.listas.solicitudes.forEach(s => solMap[s] = { total: 0, ganados: 0, monto: 0 });
+
+            globalData.leads.forEach(l => {
+                let sol = l.solicitud || "Otro";
+                if (!solMap[sol]) solMap[sol] = { total: 0, ganados: 0, monto: 0 };
+                solMap[sol].total++;
+                if (l.estatus === 'Ganado') { solMap[sol].ganados++; solMap[sol].monto += Number(l.monto_mxn || 0); }
+            });
+
+            let htmlSol = `<table class="w-full text-xs text-left border-collapse"><thead><tr class="bg-gray-100 border-b"><th class="p-2">Solicitud</th><th class="p-2">Leads</th><th class="p-2">Ganados</th><th class="p-2">Monto MXN</th></tr></thead><tbody>`;
+            for (let [k, v] of Object.entries(solMap)) {
+                if (v.total > 0) {
+                    htmlSol += `<tr class="border-b"><td class="p-2 font-medium">${k}</td><td class="p-2">${v.total}</td><td class="p-2">${v.ganado}</td><td class="p-2">$${v.monto.toLocaleString()}</td></tr>`;
+                }
+            }
+            htmlSol += `</tbody></table>`;
+            document.getElementById("table-solicitud-container").innerHTML = htmlSol;
+        }
+
+        function clearFilters() {
+            document.getElementById("filter-search").value = "";
+            document.getElementById("filter-vendedor").value = "";
+            document.getElementById("filter-estatus").value = "";
+            renderTable();
+        }
+    </script>
+</body>
+</html>
