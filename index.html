@@ -176,6 +176,27 @@
     }
     .form-input:focus { background: var(--surface); border-color: var(--accent); }
     .form-input[readonly] { background: #E5E5EA; color: var(--text-secondary); cursor: not-allowed; }
+    
+    /* Estilos para los Radio Buttons (Reemplazo de Selects) */
+    .radio-group {
+      display: flex; flex-direction: column; gap: 2px;
+      max-height: 140px; overflow-y: auto;
+      background: var(--surface-secondary); padding: 8px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+    }
+    .radio-label {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; cursor: pointer; padding: 6px 8px;
+      border-radius: 6px; transition: background 0.15s; color: var(--text-primary);
+    }
+    .radio-label:hover { background: rgba(0,0,0,0.04); }
+    .radio-label input[type="radio"] {
+      width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; margin: 0;
+    }
+    .radio-label input[type="radio"]:disabled + span {
+      color: var(--text-secondary); opacity: 0.7;
+    }
+
     .modal-footer {
       padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-secondary);
       display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
@@ -350,9 +371,10 @@
             <input type="date" id="form-fecha" class="form-input" required>
           </div>
           
+          <!-- REEMPLAZADO: Select por Radio Buttons -->
           <div class="form-group">
             <label class="form-label">Origen (Etiqueta)</label>
-            <select id="form-etiqueta" class="form-input"></select>
+            <div id="form-etiqueta-options" class="radio-group"></div>
           </div>
 
           <div class="form-group">
@@ -395,9 +417,10 @@
             <input type="text" id="form-cotizacion" class="form-input" placeholder="Folio">
           </div>
 
+          <!-- REEMPLAZADO: Select por Radio Buttons -->
           <div class="form-group">
             <label class="form-label">Vendedor asignado</label>
-            <select id="form-vendedor" class="form-input"></select>
+            <div id="form-vendedor-options" class="radio-group"></div>
           </div>
 
           <div class="form-group">
@@ -489,7 +512,6 @@
       if (!isLeads) renderDashboard();
     }
 
-    // ✅ CORREGIDO: siempre pobla los dropdowns aunque el fetch falle
     async function loadData() {
       showLoading("Sincronizando con Google Sheets...");
       try {
@@ -509,10 +531,8 @@
         }
       } catch (err) {
         console.error(err);
-        alert("No se pudo conectar con Google Sheets. Se usarán las opciones predeterminadas.");
       }
 
-      // CLAVE: poblar SIEMPRE los dropdowns, incluso si el fetch falló
       populateDropdowns();
       renderTable();
       updateKPIs();
@@ -532,7 +552,6 @@
       return clean;
     }
 
-    // ✅ CORREGIDO: a prueba de listas vacías / null / undefined
     function populateDropdowns() {
       const defaultOrigenes = ["Campaña ADS", "Campaña Facebook", "Campaña Instagram", "Campaña SEO", "Llamada", "Prospección", "Google Maps", "Campaña Tik Tok"];
       const defaultSolicitudes = ["Renta", "Venta", "Mantenimiento", "Suministro de diésel", "Instalación o maniobra", "SNI"];
@@ -540,65 +559,68 @@
 
       const listas = (rawData && rawData.listas) ? rawData.listas : {};
 
-      // Orígenes
-      let origenes = Array.isArray(listas.origenes)
-        ? listas.origenes.filter(o => o != null && String(o).trim() !== "")
-        : [];
+      let origenes = Array.isArray(listas.origenes) ? listas.origenes.filter(o => o != null && String(o).trim() !== "") : [];
       if (origenes.length === 0) origenes = defaultOrigenes;
 
-      // Solicitudes
-      let solicitudes = Array.isArray(listas.solicitudes)
-        ? listas.solicitudes.filter(s => s != null && String(s).trim() !== "")
-        : [];
+      let solicitudes = Array.isArray(listas.solicitudes) ? listas.solicitudes.filter(s => s != null && String(s).trim() !== "") : [];
       if (solicitudes.length === 0) solicitudes = defaultSolicitudes;
 
-      // Vendedores
-      let vendedores = Array.isArray(listas.vendedores)
-        ? listas.vendedores.filter(v => v != null && String(v).trim() !== "" && v !== "Sin información")
-        : [];
+      let vendedores = Array.isArray(listas.vendedores) ? listas.vendedores.filter(v => v != null && String(v).trim() !== "" && v !== "Sin información") : [];
       if (vendedores.length === 0) vendedores = defaultVendedores;
 
-      // Filtro de vendedores (solo admin)
+      // Filtro superior de vendedores (Admin)
       if (isAdmin) {
         const fv = document.getElementById("filter-vendedor");
         if (fv) {
           fv.innerHTML = '<option value="">Todos los vendedores</option>';
-          vendedores.forEach(v => {
-            fv.innerHTML += `<option value="${v}">${v}</option>`;
-          });
+          vendedores.forEach(v => { fv.innerHTML += `<option value="${v}">${v}</option>`; });
         }
       }
 
-      // Origen / Etiqueta
-      const fo = document.getElementById("form-etiqueta");
-      fo.innerHTML = "";
-      origenes.forEach(o => {
-        fo.innerHTML += `<option value="${o}">${o}</option>`;
-      });
+      // --- RENDERIZADO DE RADIO BUTTONS (Origen) ---
+      const feOptions = document.getElementById("form-etiqueta-options");
+      if (feOptions) {
+        feOptions.innerHTML = "";
+        origenes.forEach(o => {
+          feOptions.innerHTML += `
+            <label class="radio-label">
+              <input type="radio" name="etiqueta" value="${o}">
+              <span>${o}</span>
+            </label>
+          `;
+        });
+      }
 
-      // Solicitud
+      // Solicitud sigue siendo un <select> clásico
       const fs = document.getElementById("form-solicitud");
       fs.innerHTML = "";
-      solicitudes.forEach(s => {
-        fs.innerHTML += `<option value="${s}">${s}</option>`;
-      });
+      solicitudes.forEach(s => { fs.innerHTML += `<option value="${s}">${s}</option>`; });
 
-      // Vendedor en el formulario
-      const fvForm = document.getElementById("form-vendedor");
-      fvForm.innerHTML = "";
-      vendedores.forEach(v => {
-        fvForm.innerHTML += `<option value="${v}">${v}</option>`;
-      });
+      // --- RENDERIZADO DE RADIO BUTTONS (Vendedor) ---
+      const fvOptions = document.getElementById("form-vendedor-options");
+      if (fvOptions) {
+        fvOptions.innerHTML = "";
+        vendedores.forEach(v => {
+          const isCurrent = (!isAdmin && v.toLowerCase() === paramVendedor.toLowerCase());
+          fvOptions.innerHTML += `
+            <label class="radio-label">
+              <input type="radio" name="vendedor" value="${v}" ${isCurrent ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''}>
+              <span>${v}</span>
+            </label>
+          `;
+        });
 
-      if (!isAdmin) {
-        const yaEsta = vendedores.some(v =>
-          String(v).toLowerCase() === paramVendedor.toLowerCase()
-        );
-        if (!yaEsta) {
-          fvForm.innerHTML += `<option value="${paramVendedor}">${paramVendedor}</option>`;
+        if (!isAdmin) {
+          const yaEsta = vendedores.some(v => String(v).toLowerCase() === paramVendedor.toLowerCase());
+          if (!yaEsta) {
+            fvOptions.innerHTML += `
+              <label class="radio-label">
+                <input type="radio" name="vendedor" value="${paramVendedor}" checked disabled>
+                <span>${paramVendedor}</span>
+              </label>
+            `;
+          }
         }
-        fvForm.value = paramVendedor;
-        fvForm.disabled = true;
       }
     }
 
@@ -666,6 +688,12 @@
       historial.innerHTML = "";
       document.getElementById("form-nuevo-comentario").value = "";
 
+      // Limpiar radios
+      document.getElementsByName("etiqueta").forEach(r => r.checked = false);
+      if (isAdmin) {
+        document.getElementsByName("vendedor").forEach(r => r.checked = false);
+      }
+
       if (lead) {
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
@@ -673,7 +701,12 @@
         inputFecha.readOnly = true;
         labelFecha.innerText = "Fecha de creación (Fija)";
 
-        document.getElementById("form-etiqueta").value = lead.etiqueta || "";
+        // Marcar el radio de la etiqueta correcta
+        const targetEtiqueta = lead.etiqueta || "";
+        document.getElementsByName("etiqueta").forEach(r => {
+          if (r.value === targetEtiqueta) r.checked = true;
+        });
+
         document.getElementById("form-empresa").value = lead.empresa || "";
         document.getElementById("form-nombre").value = lead.nombre_cliente || "";
         document.getElementById("form-estado").value = lead.estado || "";
@@ -682,7 +715,13 @@
         document.getElementById("form-solicitud").value = lead.solicitud || "";
         document.getElementById("form-capacidad").value = lead.capacidad || "";
         document.getElementById("form-cotizacion").value = lead.cotizacion || "";
-        document.getElementById("form-vendedor").value = isAdmin ? (lead.vendedor || "") : paramVendedor;
+
+        // Marcar el radio del vendedor correcto
+        const targetVendedor = isAdmin ? (lead.vendedor || "") : paramVendedor;
+        document.getElementsByName("vendedor").forEach(r => {
+          if (r.value === targetVendedor) r.checked = true;
+        });
+
         document.getElementById("form-estatus").value = lead.estatus || "Desarrollo (10%)";
         document.getElementById("form-monto-mxn").value = lead.monto_mxn || 0;
         document.getElementById("form-monto-usd").value = lead.monto_usd || 0;
@@ -704,7 +743,20 @@
 
         document.getElementById("form-estatus").value = "Desarrollo (10%)";
         historial.innerHTML = `<span style="color:var(--text-secondary);">El historial se creará al guardar.</span>`;
-        if (!isAdmin) document.getElementById("form-vendedor").value = paramVendedor;
+        
+        // Seleccionar el primer origen por defecto
+        const etiquetas = document.getElementsByName("etiqueta");
+        if (etiquetas.length > 0) etiquetas[0].checked = true;
+
+        // Seleccionar vendedor por defecto
+        const vendedores = document.getElementsByName("vendedor");
+        if (!isAdmin) {
+          vendedores.forEach(r => {
+            if (r.value === paramVendedor) r.checked = true;
+          });
+        } else if (vendedores.length > 0) {
+          vendedores[0].checked = true;
+        }
       }
     }
 
@@ -738,10 +790,14 @@
         observacionesActuales = observacionesActuales ? (observacionesActuales + "\n\n" + entrada) : entrada;
       }
 
+      // Obtener valores de los Radio Buttons
+      const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
+      const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
+
       let leadData = {
         no: document.getElementById("form-no").value,
         fecha: document.getElementById("form-fecha").value,
-        etiqueta: document.getElementById("form-etiqueta").value,
+        etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
         empresa: document.getElementById("form-empresa").value,
         nombre_cliente: document.getElementById("form-nombre").value,
         estado: document.getElementById("form-estado").value,
@@ -750,7 +806,7 @@
         solicitud: document.getElementById("form-solicitud").value,
         capacidad: document.getElementById("form-capacidad").value,
         cotizacion: document.getElementById("form-cotizacion").value,
-        vendedor: isAdmin ? document.getElementById("form-vendedor").value : paramVendedor,
+        vendedor: isAdmin ? (selectedVendedor ? selectedVendedor.value : "") : paramVendedor,
         estatus: document.getElementById("form-estatus").value,
         ultimo_seguimiento: new Date().toISOString().split('T')[0],
         monto_mxn: document.getElementById("form-monto-mxn").value,
