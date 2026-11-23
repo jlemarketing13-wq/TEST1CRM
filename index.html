@@ -438,7 +438,7 @@
   </div>
 
   <script>
-    // CAMBIA ESTA URL POR TU ENLACE DE GOOGLE APPS SCRIPT TERMINADO EN /exec (Línea 241)
+    // CAMBIA ESTA URL POR TU ENLACE DE GOOGLE APPS SCRIPT TERMINADO EN /exec
     const API_URL = "https://script.google.com/macros/s/AKfycbyH6XsFm9512qFeViEdXsXe7MZQh7yZum9dnQCoIgI5iq8io9vEzf6XWVLPXbtjW6gV/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -489,32 +489,35 @@
       if (!isLeads) renderDashboard();
     }
 
+    // ✅ CORREGIDO: siempre pobla los dropdowns aunque el fetch falle
     async function loadData() {
       showLoading("Sincronizando con Google Sheets...");
       try {
         let res = await fetch(API_URL);
         let result = await res.json();
         if (result.status === "success") {
-          rawData = result.data;
+          rawData = result.data || { leads: [], listas: {} };
           if (isAdmin) {
-            visibleLeads = rawData.leads;
+            visibleLeads = rawData.leads || [];
           } else {
-            visibleLeads = rawData.leads.filter(l => 
+            visibleLeads = (rawData.leads || []).filter(l =>
               String(l.vendedor || "").trim().toLowerCase() === paramVendedor.trim().toLowerCase()
             );
-          }
-          populateDropdowns();
-          renderTable();
-          updateKPIs();
-          if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
-            renderDashboard();
           }
         } else {
           alert("Error al cargar: " + result.message);
         }
       } catch (err) {
         console.error(err);
-        alert("No se pudo conectar con Google Sheets.");
+        alert("No se pudo conectar con Google Sheets. Se usarán las opciones predeterminadas.");
+      }
+
+      // CLAVE: poblar SIEMPRE los dropdowns, incluso si el fetch falló
+      populateDropdowns();
+      renderTable();
+      updateKPIs();
+      if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
+        renderDashboard();
       }
       hideLoading();
     }
@@ -529,36 +532,69 @@
       return clean;
     }
 
+    // ✅ CORREGIDO: a prueba de listas vacías / null / undefined
     function populateDropdowns() {
-      // Listas por defecto por si la hoja de Google Sheets viene vacía o incompleta
       const defaultOrigenes = ["Campaña ADS", "Campaña Facebook", "Campaña Instagram", "Campaña SEO", "Llamada", "Prospección", "Google Maps", "Campaña Tik Tok"];
       const defaultSolicitudes = ["Renta", "Venta", "Mantenimiento", "Suministro de diésel", "Instalación o maniobra", "SNI"];
       const defaultVendedores = ["Angel", "Ana", "Brenda", "Dayana", "Fabi", "Jorge"];
 
-      let origenes = (rawData.listas && rawData.listas.origenes && rawData.listas.origenes.length > 0) ? rawData.listas.origenes : defaultOrigenes;
-      let solicitudes = (rawData.listas && rawData.listas.solicitudes && rawData.listas.solicitudes.length > 0) ? rawData.listas.solicitudes : defaultSolicitudes;
-      let vendedores = (rawData.listas && rawData.listas.vendedores && rawData.listas.vendedores.length > 0) ? rawData.listas.vendedores.filter(v => v !== "Sin información") : defaultVendedores;
+      const listas = (rawData && rawData.listas) ? rawData.listas : {};
 
+      // Orígenes
+      let origenes = Array.isArray(listas.origenes)
+        ? listas.origenes.filter(o => o != null && String(o).trim() !== "")
+        : [];
+      if (origenes.length === 0) origenes = defaultOrigenes;
+
+      // Solicitudes
+      let solicitudes = Array.isArray(listas.solicitudes)
+        ? listas.solicitudes.filter(s => s != null && String(s).trim() !== "")
+        : [];
+      if (solicitudes.length === 0) solicitudes = defaultSolicitudes;
+
+      // Vendedores
+      let vendedores = Array.isArray(listas.vendedores)
+        ? listas.vendedores.filter(v => v != null && String(v).trim() !== "" && v !== "Sin información")
+        : [];
+      if (vendedores.length === 0) vendedores = defaultVendedores;
+
+      // Filtro de vendedores (solo admin)
       if (isAdmin) {
-        let fv = document.getElementById("filter-vendedor");
-        fv.innerHTML = '<option value="">Todos los vendedores</option>';
-        vendedores.forEach(v => fv.innerHTML += `<option value="${v}">${v}</option>`);
+        const fv = document.getElementById("filter-vendedor");
+        if (fv) {
+          fv.innerHTML = '<option value="">Todos los vendedores</option>';
+          vendedores.forEach(v => {
+            fv.innerHTML += `<option value="${v}">${v}</option>`;
+          });
+        }
       }
 
-      let fo = document.getElementById("form-etiqueta");
+      // Origen / Etiqueta
+      const fo = document.getElementById("form-etiqueta");
       fo.innerHTML = "";
-      origenes.forEach(o => fo.innerHTML += `<option value="${o}">${o}</option>`);
+      origenes.forEach(o => {
+        fo.innerHTML += `<option value="${o}">${o}</option>`;
+      });
 
-      let fs = document.getElementById("form-solicitud");
+      // Solicitud
+      const fs = document.getElementById("form-solicitud");
       fs.innerHTML = "";
-      solicitudes.forEach(s => fs.innerHTML += `<option value="${s}">${s}</option>`);
+      solicitudes.forEach(s => {
+        fs.innerHTML += `<option value="${s}">${s}</option>`;
+      });
 
-      let fvForm = document.getElementById("form-vendedor");
+      // Vendedor en el formulario
+      const fvForm = document.getElementById("form-vendedor");
       fvForm.innerHTML = "";
-      vendedores.forEach(v => fvForm.innerHTML += `<option value="${v}">${v}</option>`);
+      vendedores.forEach(v => {
+        fvForm.innerHTML += `<option value="${v}">${v}</option>`;
+      });
 
       if (!isAdmin) {
-        if (!vendedores.some(v => v.toLowerCase() === paramVendedor.toLowerCase())) {
+        const yaEsta = vendedores.some(v =>
+          String(v).toLowerCase() === paramVendedor.toLowerCase()
+        );
+        if (!yaEsta) {
           fvForm.innerHTML += `<option value="${paramVendedor}">${paramVendedor}</option>`;
         }
         fvForm.value = paramVendedor;
