@@ -173,7 +173,7 @@
       </div>
     </header>
 
-    <!-- Pestañas de Navegación -->
+    <!-- Pestañas -->
     <div class="filter-bar">
       <button class="filter-btn active" onclick="switchTab('leads')" id="tab-leads">Registro y Cartera</button>
       <button class="filter-btn" onclick="switchTab('dashboard')" id="tab-dashboard">Dashboard y Reporte Semanal</button>
@@ -247,10 +247,8 @@
       </div>
     </div>
 
-    <!-- VISTA 2: DASHBOARD Y REPORTE SEMANAL ESTILO APPLE -->
+    <!-- VISTA 2: DASHBOARD Y REPORTE SEMANAL -->
     <div id="view-dashboard" class="hidden space-y-6">
-      
-      <!-- Fila 1: Captación por Día y Tipo de Solicitud (Con barra segmentada y leyenda) -->
       <section class="grid-2">
         <div class="card" style="margin-bottom:0;">
           <div class="card-header">
@@ -270,7 +268,6 @@
         </div>
       </section>
 
-      <!-- Fila 2: Origen de Captación y Carga por Asesor (Con subtotales de Renta/Venta) -->
       <section class="grid-2">
         <div class="card" style="margin-bottom:0;">
           <div class="card-header">
@@ -289,7 +286,6 @@
         </div>
       </section>
 
-      <!-- Fila 3: Fases del Embudo y Tabla de Dirección (Solo Admin) -->
       <section class="grid-2">
         <div class="card" style="margin-bottom:0;">
           <div class="card-header">
@@ -708,7 +704,13 @@
 
       // 1. Gráfico vertical diario (Lun - Vie)
       const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
-      const dayCounts = days.map(() => Math.floor(Math.random() * (total / 3 + 1))); // O basado en fecha real de leads
+      const dayCounts = [
+        Math.round(total * 0.15),
+        Math.round(total * 0.25),
+        Math.round(total * 0.20),
+        Math.round(total * 0.20),
+        Math.round(total * 0.20)
+      ];
       const maxDay = Math.max(...dayCounts, 1);
 
       document.getElementById("dailyChart").innerHTML = days.map((d, i) => {
