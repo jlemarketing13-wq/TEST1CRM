@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Leads y Cotizaciones</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+
+    <!-- Banner de sincronización -->
+    <div id="loading-banner" class="fixed top-0 left-0 right-0 z-50 bg-slate-900 text-white text-center py-2 text-xs font-medium tracking-wide shadow hidden">
+        <span id="loading-text">Sincronizando con Google Sheets...</span>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- Encabezado -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-slate-200 gap-4">
+            <div>
+                <div class="flex items-center gap-2.5">
+                    <h1 class="text-xl font-semibold tracking-tight text-slate-900">CRM Leads y Cotizaciones</h1>
+                    <span id="role-badge" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700">Cargando...</span>
+                </div>
+                <p id="header-subtitle" class="text-xs text-slate-500 mt-1">Gestión comercial y seguimiento de fases</p>
+            </div>
+            <div class="flex gap-2.5 w-full md:w-auto">
+                <button onclick="openModal()" class="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-medium shadow-sm transition">
+                    + Nuevo Lead
+                </button>
+                <button onclick="loadData()" class="bg-white border border-slate-300 hover:bg-gray-100 text-slate-700 px-3.5 py-2 rounded-lg text-xs font-medium transition">
+                    Actualizar
+                </button>
+            </div>
+        </header>
+
+        <!-- Navegación -->
+        <div class="flex border-b border-slate-200 mb-6 gap-6">
+            <button onclick="switchTab('leads')" id="tab-btn-leads" class="pb-2.5 border-b-2 border-slate-900 text-slate-900 font-medium text-xs transition">
+                Registro y Cartera
+            </button>
+            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-xs transition">
+                Dashboard y Fases del Embudo
+            </button>
+        </div>
+
+        <!-- VISTA 1: REGISTRO Y CARTERA -->
+        <div id="view-leads" class="space-y-5">
+            
+            <!-- Tarjetas KPI -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Total Leads</p>
+                    <p id="kpi-total" class="text-xl font-semibold text-slate-900 mt-1">0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-blue-600 font-medium uppercase tracking-wider">En Desarrollo</p>
+                    <p id="kpi-desarrollo" class="text-xl font-semibold text-blue-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-amber-600 font-medium uppercase tracking-wider">Cotizados (30-50%)</p>
+                    <p id="kpi-cotizados" class="text-xl font-semibold text-amber-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-emerald-600 font-medium uppercase tracking-wider">Pagados (100%)</p>
+                    <p id="kpi-pagados" class="text-xl font-semibold text-emerald-600 mt-1">0</p>
+                </div>
+                <div id="kpi-card-sin-vendedor" class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-rose-600 font-medium uppercase tracking-wider">Sin Vendedor</p>
+                    <p id="kpi-sin-vendedor" class="text-xl font-semibold text-rose-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-emerald-700 font-medium uppercase tracking-wider">Monto Pagado</p>
+                    <p id="kpi-monto-ganado" class="text-base font-semibold text-emerald-700 mt-1.5">$0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <p class="text-[11px] text-slate-600 font-medium uppercase tracking-wider">En Proceso MXN</p>
+                    <p id="kpi-en-juego" class="text-base font-semibold text-slate-900 mt-1.5">$0</p>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-600 mb-1">Buscar</label>
+                    <input type="text" id="filter-search" oninput="renderTable()" placeholder="Empresa, cliente o cotización..." class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div id="filter-vendedor-container">
+                    <label class="block text-[11px] font-medium text-slate-600 mb-1">Vendedor</label>
+                    <select id="filter-vendedor" onchange="renderTable()" class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                        <option value="">Todos los vendedores</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-600 mb-1">Fase del Embudo</label>
+                    <select id="filter-estatus" onchange="renderTable()" class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                        <option value="">Todas las fases</option>
+                        <option value="Desarrollo (10%)">Desarrollo (10%)</option>
+                        <option value="Cotización (30%)">Cotización (30%)</option>
+                        <option value="Recotización (50%)">Recotización (50%)</option>
+                        <option value="Orden de compra (80%)">Orden de compra (80%)</option>
+                        <option value="Pagado (100%)">Pagado (100%)</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="clearFilters()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-2 rounded-lg transition">Limpiar filtros</button>
+                </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-xs">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                <th class="p-3">No.</th>
+                                <th class="p-3">Creación (Fija)</th>
+                                <th class="p-3">Empresa / Cliente</th>
+                                <th class="p-3">Origen</th>
+                                <th class="p-3">Solicitud</th>
+                                <th class="p-3">Cotización</th>
+                                <th class="p-3">Vendedor</th>
+                                <th class="p-3">Fase Actual</th>
+                                <th class="p-3">Monto MXN</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 2: DASHBOARD -->
+        <div id="view-dashboard" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <h3 class="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Leads Registrados por Semana</h3>
+                    <div class="h-60"><canvas id="chart-semanal"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <h3 id="chart-right-title" class="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Distribución por Fases del Embudo</h3>
+                    <div class="h-60"><canvas id="chart-secundario"></canvas></div>
+                </div>
+            </div>
+
+            <div id="admin-vendedores-section" class="hidden bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+                <h3 class="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Rendimiento Comparativo del Equipo</h3>
+                <div id="table-vendedor-container" class="overflow-x-auto"></div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <h3 class="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Desglose por Origen</h3>
+                    <div id="table-origen-container" class="overflow-x-auto"></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+                    <h3 class="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Desglose por Solicitud</h3>
+                    <div id="table-solicitud-container" class="overflow-x-auto"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE FORMULARIO -->
+    <div id="lead-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 id="modal-title" class="font-semibold text-base text-slate-900">Registrar Nuevo Lead</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+            </div>
+            <form id="lead-form" onsubmit="saveLead(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <input type="hidden" id="form-no">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Fecha de creación (Fija)</label>
+                    <input type="date" id="form-fecha" required class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900 bg-slate-100" readonly>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Origen (Etiqueta)</label>
+                    <select id="form-etiqueta" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Empresa</label>
+                    <input type="text" id="form-empresa" required placeholder="Nombre de la empresa" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Nombre del cliente</label>
+                    <input type="text" id="form-nombre" required placeholder="Contacto principal" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Estado</label>
+                    <input type="text" id="form-estado" placeholder="Ej. Estado de México, CDMX..." class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Teléfono</label>
+                    <input type="text" id="form-telefono" placeholder="10 dígitos" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">E-mail</label>
+                    <input type="email" id="form-email" placeholder="correo@empresa.com" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Solicitud</label>
+                    <select id="form-solicitud" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Capacidad</label>
+                    <input type="text" id="form-capacidad" placeholder="Ej. 100KW, 500KW..." class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1"># Cotización</label>
+                    <input type="text" id="form-cotizacion" placeholder="Folio de cotización" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Vendedor asignado</label>
+                    <select id="form-vendedor" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-500"></select>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Fase del Embudo</label>
+                    <select id="form-estatus" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900 font-semibold text-blue-700">
+                        <option value="Desarrollo (10%)">Desarrollo (10%)</option>
+                        <option value="Cotización (30%)">Cotización (30%)</option>
+                        <option value="Recotización (50%)">Recotización (50%)</option>
+                        <option value="Orden de compra (80%)">Orden de compra (80%)</option>
+                        <option value="Pagado (100%)">Pagado (100%)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Monto MXN (antes de IVA)</label>
+                    <input type="number" step="any" id="form-monto-mxn" value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Monto USD (antes de IVA)</label>
+                    <input type="number" step="any" id="form-monto-usd" value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900">
+                </div>
+                <div class="md:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block font-semibold text-slate-800 mb-1">Historial de Comentarios y Bitácora</label>
+                    <div id="form-historial-observaciones" class="text-slate-600 text-[11px] mb-2 max-h-28 overflow-y-auto space-y-1 bg-white p-2 rounded border border-slate-200"></div>
+                    <label class="block font-medium text-slate-700 mb-1">Agregar nuevo comentario / movimiento:</label>
+                    <input type="text" id="form-nuevo-comentario" placeholder="Ej. Se envió cotización formal actualizada..." class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-slate-900 bg-white">
+                </div>
+                <div class="md:col-span-2 flex justify-end gap-2.5 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium">Cancelar</button>
+                    <button type="submit" id="btn-submit-lead" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-lg font-medium shadow-xs disabled:opacity-50">Guardar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "AQUÍ_PEGAR_URL_DE_WEB_APP"; 
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramVendedor = urlParams.get('vendedor') || "ADMIN"; 
+        const isAdmin = paramVendedor.toUpperCase() === "ADMIN";
+
+        let rawData = { leads: [], listas: { origenes: [], solicitudes: [], estatus: [], vendedores: [] } };
+        let visibleLeads = [];
+        let isSaving = false;
+        let currentEditingLead = null;
+        let chartSemanalInstance = null;
+        let chartSecundarioInstance = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            configureRoleUI();
+            loadData();
+        });
+
+        function configureRoleUI() {
+            const badge = document.getElementById("role-badge");
+            const subtitle = document.getElementById("header-subtitle");
+            if (isAdmin) {
+                badge.innerText = "Vista General · Dirección";
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-900 text-white";
+                subtitle.innerText = "Consolidado global de fases comerciales";
+                document.getElementById("admin-vendedores-section").classList.remove("hidden");
+            } else {
+                badge.innerText = `Ejecutivo: ${paramVendedor}`;
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800";
+                subtitle.innerText = `Cartera y seguimiento comercial de ${paramVendedor}`;
+                document.getElementById("filter-vendedor-container").classList.add("hidden");
+                document.getElementById("kpi-card-sin-vendedor").classList.add("hidden");
+            }
+        }
+
+        function showLoading(text) {
+            document.getElementById("loading-text").innerText = text;
+            document.getElementById("loading-banner").classList.remove("hidden");
+        }
+
+        function hideLoading() {
+            document.getElementById("loading-banner").classList.add("hidden");
+        }
+
+        function switchTab(tab) {
+            const isLeads = tab === 'leads';
+            document.getElementById('view-leads').classList.toggle('hidden', !isLeads);
+            document.getElementById('view-dashboard').classList.toggle('hidden', isLeads);
+            
+            document.getElementById('tab-btn-leads').className = isLeads 
+                ? "pb-2.5 border-b-2 border-slate-900 text-slate-900 font-medium text-xs transition"
+                : "pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-xs transition";
+            
+            document.getElementById('tab-btn-dashboard').className = !isLeads 
+                ? "pb-2.5 border-b-2 border-slate-900 text-slate-900 font-medium text-xs transition"
+                : "pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-xs transition";
+
+            if (!isLeads) renderDashboard();
+        }
+
+        async function loadData() {
+            showLoading("Sincronizando datos con Google Sheets...");
+            try {
+                let response = await fetch(API_URL);
+                let result = await response.json();
+                if (result.status === "success") {
+                    rawData = result.data;
+                    if (isAdmin) {
+                        visibleLeads = rawData.leads;
+                    } else {
+                        visibleLeads = rawData.leads.filter(l => 
+                            String(l.vendedor || "").trim().toLowerCase() === paramVendedor.trim().toLowerCase()
+                        );
+                    }
+                    populateDropdowns();
+                    renderTable();
+                    updateKPIs();
+                    if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
+                        renderDashboard();
+                    }
+                } else {
+                    alert("Error al cargar: " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("No se pudo conectar con Google Sheets.");
+            }
+            hideLoading();
+        }
+
+        function formatDateClean(dateStr) {
+            if (!dateStr) return "-";
+            let clean = String(dateStr).split('T')[0];
+            if (clean.includes("GMT") || clean.length > 12) {
+                let d = new Date(dateStr);
+                if (!isNaN(d)) return d.toISOString().split('T')[0];
+            }
+            return clean;
+        }
+
+        function populateDropdowns() {
+            if (isAdmin) {
+                let filterV = document.getElementById("filter-vendedor");
+                filterV.innerHTML = '<option value="">Todos los vendedores</option>';
+                rawData.listas.vendedores.forEach(v => {
+                    filterV.innerHTML += `<option value="${v}">${v}</option>`;
+                });
+            }
+
+            let fOri = document.getElementById("form-etiqueta");
+            fOri.innerHTML = "";
+            rawData.listas.origenes.forEach(o => fOri.innerHTML += `<option value="${o}">${o}</option>`);
+
+            let fSol = document.getElementById("form-solicitud");
+            fSol.innerHTML = "";
+            rawData.listas.solicitudes.forEach(s => fSol.innerHTML += `<option value="${s}">${s}</option>`);
+
+            let fVen = document.getElementById("form-vendedor");
+            fVen.innerHTML = "";
+            rawData.listas.vendedores.forEach(v => fVen.innerHTML += `<option value="${v}">${v}</option>`);
+            
+            if (!isAdmin) {
+                if (!rawData.listas.vendedores.some(v => v.toLowerCase() === paramVendedor.toLowerCase())) {
+                    fVen.innerHTML += `<option value="${paramVendedor}">${paramVendedor}</option>`;
+                }
+                fVen.value = paramVendedor;
+                fVen.disabled = true;
+            } else {
+                fVen.disabled = false;
+            }
+        }
+
+        function renderTable() {
+            let tbody = document.getElementById("leads-table-body");
+            tbody.innerHTML = "";
+
+            let search = document.getElementById("filter-search").value.toLowerCase();
+            let fVendedor = isAdmin ? document.getElementById("filter-vendedor").value : "";
+            let fEstatus = document.getElementById("filter-estatus").value;
+
+            let filtered = visibleLeads.filter(l => {
+                let matchSearch = (String(l.empresa) + " " + String(l.nombre_cliente) + " " + String(l.cotizacion)).toLowerCase().includes(search);
+                let matchVendedor = fVendedor === "" || l.vendedor === fVendedor;
+                let matchEstatus = fEstatus === "" || l.estatus === fEstatus;
+                return matchSearch && matchVendedor && matchEstatus;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="p-6 text-center text-slate-400">No hay registros para mostrar.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(l => {
+                let sinVendedor = !l.vendedor || l.vendedor === "Sin información" || l.vendedor.trim() === "";
+                let rowBg = (isAdmin && sinVendedor) ? "bg-rose-50/70 hover:bg-rose-100/70" : "hover:bg-slate-50";
+                let fechaShow = formatDateClean(l.fecha);
+
+                tbody.innerHTML += `
+                    <tr class="${rowBg} transition">
+                        <td class="p-3 font-medium text-slate-500">${l.no}</td>
+                        <td class="p-3 whitespace-nowrap text-slate-600 font-mono text-[11px]">${fechaShow}</td>
+                        <td class="p-3">
+                            <div class="font-semibold text-slate-900">${l.empresa || 'Sin empresa'}</div>
+                            <div class="text-slate-500 text-[11px]">${l.nombre_cliente || ''}</div>
+                        </td>
+                        <td class="p-3 text-slate-600">${l.etiqueta || '-'}</td>
+                        <td class="p-3 text-slate-600">${l.solicitud || '-'}</td>
+                        <td class="p-3 font-mono text-slate-700">${l.cotizacion || '-'}</td>
+                        <td class="p-3 font-medium ${sinVendedor ? 'text-rose-600' : 'text-slate-700'}">${l.vendedor || 'Sin asignar'}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                ${l.estatus || 'Desarrollo (10%)'}
+                            </span>
+                        </td>
+                        <td class="p-3 font-medium text-slate-900">$${Number(l.monto_mxn || 0).toLocaleString()}</td>
+                        <td class="p-3 text-right">
+                            <button onclick="editLead(${l.no})" class="text-slate-600 hover:text-slate-900 font-medium underline">Gestionar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function updateKPIs() {
+            document.getElementById("kpi-total").innerText = visibleLeads.length;
+            
+            let desarrollo = visibleLeads.filter(l => !l.estatus || l.estatus.includes("Desarrollo")).length;
+            let cotizados = visibleLeads.filter(l => l.estatus && (l.estatus.includes("Cotización") || l.estatus.includes("Recotización") || l.estatus.includes("Orden"))).length;
+            let pagados = visibleLeads.filter(l => l.estatus && l.estatus.includes("Pagado")).length;
+            let sinVendedor = visibleLeads.filter(l => !l.vendedor || l.vendedor === "Sin información" || l.vendedor.trim() === "").length;
+
+            let montoPagado = visibleLeads.filter(l => l.estatus && l.estatus.includes("Pagado")).reduce((acc, l) => acc + Number(l.monto_mxn || 0), 0);
+            let enProceso = visibleLeads.filter(l => !l.estatus || !l.estatus.includes("Pagado")).reduce((acc, l) => acc + Number(l.monto_mxn || 0), 0);
+
+            document.getElementById("kpi-desarrollo").innerText = desarrollo;
+            document.getElementById("kpi-cotizados").innerText = cotizados;
+            document.getElementById("kpi-pagados").innerText = pagados;
+            document.getElementById("kpi-sin-vendedor").innerText = sinVendedor;
+            document.getElementById("kpi-monto-ganado").innerText = "$" + montoPagado.toLocaleString();
+            document.getElementById("kpi-en-juego").innerText = "$" + enProceso.toLocaleString();
+        }
+
+        function openModal(lead = null) {
+            document.getElementById("lead-modal").classList.remove("hidden");
+            currentEditingLead = lead;
+            
+            let historialDiv = document.getElementById("form-historial-observaciones");
+            historialDiv.innerHTML = "";
+            document.getElementById("form-nuevo-comentario").value = "";
+
+            if (lead) {
+                document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
+                document.getElementById("form-no").value = lead.no;
+                document.getElementById("form-fecha").value = formatDateClean(lead.fecha);
+                document.getElementById("form-etiqueta").value = lead.etiqueta;
+                document.getElementById("form-empresa").value = lead.empresa;
+                document.getElementById("form-nombre").value = lead.nombre_cliente;
+                document.getElementById("form-estado").value = lead.estado;
+                document.getElementById("form-telefono").value = lead.telefono;
+                document.getElementById("form-email").value = lead.email;
+                document.getElementById("form-solicitud").value = lead.solicitud;
+                document.getElementById("form-capacidad").value = lead.capacidad;
+                document.getElementById("form-cotizacion").value = lead.cotizacion;
+                document.getElementById("form-vendedor").value = isAdmin ? lead.vendedor : paramVendedor;
+                document.getElementById("form-estatus").value = lead.estatus || "Desarrollo (10%)";
+                document.getElementById("form-monto-mxn").value = lead.monto_mxn;
+                document.getElementById("form-monto-usd").value = lead.monto_usd;
+                
+                // Mostrar historial acumulado de observaciones
+                if (lead.observaciones && lead.observaciones.trim() !== "") {
+                    let lineas = lead.observaciones.split("\n\n");
+                    lineas.forEach(l => {
+                        if (l.trim() !== "") {
+                            historialDiv.innerHTML += `<div class="p-1.5 bg-slate-50 rounded border border-slate-100">${l}</div>`;
+                        }
+                    });
+                } else {
+                    historialDiv.innerHTML = `<span class="text-slate-400">Sin comentarios previos.</span>`;
+                }
+            } else {
+                document.getElementById("modal-title").innerText = "Registrar Nuevo Lead";
+                document.getElementById("lead-form").reset();
+                document.getElementById("form-no").value = "";
+                // Fecha de creación fija al día actual
+                document.getElementById("form-fecha").value = new Date().toISOString().split('T')[0];
+                document.getElementById("form-estatus").value = "Desarrollo (10%)";
+                historialDiv.innerHTML = `<span class="text-slate-400">El historial se creará al guardar.</span>`;
+                if (!isAdmin) {
+                    document.getElementById("form-vendedor").value = paramVendedor;
+                }
+            }
+        }
+
+        function closeModal() {
+            document.getElementById("lead-modal").classList.add("hidden");
+        }
+
+        function editLead(no) {
+            let lead = visibleLeads.find(l => Number(l.no) === Number(no));
+            if (lead) openModal(lead);
+        }
+
+        async function saveLead(event) {
+            event.preventDefault();
+            if (isSaving) return;
+            isSaving = true;
+
+            const btnSubmit = document.getElementById("btn-submit-lead");
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "Guardando...";
+            showLoading("Guardando cambios y bitácora...");
+
+            let nuevoComentario = document.getElementById("form-nuevo-comentario").value.trim();
+            let observacionesActuales = currentEditingLead ? (currentEditingLead.observaciones || "") : "";
+
+            if (nuevoComentario !== "") {
+                let fechaHoy = new Date().toISOString().split('T')[0];
+                let horaActual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                let autor = isAdmin ? "Dirección" : paramVendedor;
+                let nuevaEntrada = `[${fechaHoy} ${horaActual} - ${autor}]: ${nuevoComentario}`;
+                
+                observacionesActuales = observacionesActuales ? (observacionesActuales + "\n\n" + nuevaEntrada) : nuevaEntrada;
+            }
+
+            let leadData = {
+                no: document.getElementById("form-no").value,
+                fecha: document.getElementById("form-fecha").value, // Fecha fija de creación
+                etiqueta: document.getElementById("form-etiqueta").value,
+                empresa: document.getElementById("form-empresa").value,
+                nombre_cliente: document.getElementById("form-nombre").value,
+                estado: document.getElementById("form-estado").value,
+                telefono: document.getElementById("form-telefono").value,
+                email: document.getElementById("form-email").value,
+                solicitud: document.getElementById("form-solicitud").value,
+                capacidad: document.getElementById("form-capacidad").value,
+                cotizacion: document.getElementById("form-cotizacion").value,
+                vendedor: isAdmin ? document.getElementById("form-vendedor").value : paramVendedor,
+                estatus: document.getElementById("form-estatus").value,
+                ultimo_seguimiento: new Date().toISOString().split('T')[0], // Auditoría de último movimiento
+                monto_mxn: document.getElementById("form-monto-mxn").value,
+                monto_usd: document.getElementById("form-monto-usd").value,
+                observaciones: observacionesActuales
+            };
+
+            try {
+                let response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "saveLead", lead: leadData })
+                });
+                let result = await response.json();
+                if (result.status === "success") {
+                    closeModal();
+                    await loadData();
+                } else {
+                    alert("Error al guardar: " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de red al intentar guardar.");
+            } finally {
+                isSaving = false;
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "Guardar Registro";
+                hideLoading();
+            }
+        }
+
+        function getWeekLabel(dateStr) {
+            let clean = formatDateClean(dateStr);
+            if (clean === "-") return "Sin fecha";
+            let parts = clean.split('-');
+            if (parts.length !== 3) return "Sin fecha";
+            let d = new Date(parts[0], parts[1] - 1, parts[2]);
+            let day = d.getDay();
+            let diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            let monday = new Date(d.setDate(diff));
+            return "Sem " + monday.toISOString().split('T')[0];
+        }
+
+        function renderDashboard() {
+            let weekMap = {};
+            visibleLeads.forEach(l => {
+                let w = getWeekLabel(l.fecha);
+                weekMap[w] = (weekMap[w] || 0) + 1;
+            });
+            let sortedWeeks = Object.keys(weekMap).sort();
+            
+            if (chartSemanalInstance) chartSemanalInstance.destroy();
+            chartSemanalInstance = new Chart(document.getElementById('chart-semanal'), {
+                type: 'bar',
+                data: {
+                    labels: sortedWeeks,
+                    datasets: [{ label: 'Leads creados', data: sortedWeeks.map(w => weekMap[w]), backgroundColor: '#0f172a', borderRadius: 6 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            if (chartSecundarioInstance) chartSecundarioInstance.destroy();
+            let faseCounts = { "Desarrollo": 0, "Cotización": 0, "Recotización": 0, "Orden de compra": 0, "Pagado": 0 };
+            visibleLeads.forEach(l => {
+                let est = l.estatus || "Desarrollo";
+                for (let k in faseCounts) {
+                    if (est.includes(k)) faseCounts[k]++;
+                }
+            });
+
+            chartSecundarioInstance = new Chart(document.getElementById('chart-secundario'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(faseCounts),
+                    datasets: [{ data: Object.values(faseCounts), backgroundColor: ['#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4', '#10b981'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            if (isAdmin) {
+                let vendMap = {};
+                rawData.listas.vendedores.forEach(v => {
+                    if (v !== "Sin información") vendMap[v] = { total: 0, pagados: 0, ganadoMxn: 0, procesoMxn: 0 };
+                });
+                vendMap["Sin asignar"] = { total: 0, pagados: 0, ganadoMxn: 0, procesoMxn: 0 };
+
+                visibleLeads.forEach(l => {
+                    let ven = l.vendedor && l.vendedor !== "Sin información" ? l.vendedor : "Sin asignar";
+                    if (!vendMap[ven]) vendMap[ven] = { total: 0, pagados: 0, ganadoMxn: 0, procesoMxn: 0 };
+                    vendMap[ven].total++;
+                    if (l.estatus && l.estatus.includes("Pagado")) {
+                        vendMap[ven].pagados++;
+                        vendMap[ven].ganadoMxn += Number(l.monto_mxn || 0);
+                    } else {
+                        vendMap[ven].procesoMxn += Number(l.monto_mxn || 0);
+                    }
+                });
+
+                let htmlVend = `<table class="w-full text-xs text-left border-collapse">
+                    <thead><tr class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                        <th class="p-2.5">Ejecutivo</th><th class="p-2.5">Total Leads</th><th class="p-2.5">Pagados (100%)</th><th class="p-2.5">Monto Cobrado MXN</th><th class="p-2.5">Monto en Proceso MXN</th>
+                    </tr></thead><tbody class="divide-y divide-slate-100">`;
+                
+                for (let [k, v] of Object.entries(vendMap)) {
+                    if (v.total === 0 && k === "Sin asignar") continue;
+                    htmlVend += `<tr>
+                        <td class="p-2.5 font-semibold text-slate-900">${k}</td>
+                        <td class="p-2.5">${v.total}</td>
+                        <td class="p-2.5 text-emerald-600 font-medium">${v.pagados}</td>
+                        <td class="p-2.5 text-emerald-700 font-semibold">$${v.ganadoMxn.toLocaleString()}</td>
+                        <td class="p-2.5 text-slate-700">$${v.procesoMxn.toLocaleString()}</td>
+                    </tr>`;
+                }
+                htmlVend += `</tbody></table>`;
+                document.getElementById("table-vendedor-container").innerHTML = htmlVend;
+            }
+
+            renderMetricTable("etiqueta", "table-origen-container", "Origen");
+            renderMetricTable("solicitud", "table-solicitud-container", "Solicitud");
+        }
+
+        function renderMetricTable(field, containerId, labelHeader) {
+            let map = {};
+            visibleLeads.forEach(l => {
+                let key = l[field] || "Sin especificar";
+                if (!map[key]) map[key] = { total: 0, pagados: 0, monto: 0 };
+                map[key].total++;
+                if (l.estatus && l.estatus.includes("Pagado")) {
+                    map[key].pagados++;
+                    map[key].monto += Number(l.monto_mxn || 0);
+                }
+            });
+
+            let html = `<table class="w-full text-xs text-left border-collapse">
+                <thead><tr class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                    <th class="p-2.5">${labelHeader}</th><th class="p-2.5">Leads</th><th class="p-2.5">Pagados</th><th class="p-2.5">Monto Pagado MXN</th>
+                </tr></thead><tbody class="divide-y divide-slate-100">`;
+
+            for (let [k, v] of Object.entries(map)) {
+                html += `<tr>
+                    <td class="p-2.5 font-medium text-slate-800">${k}</td>
+                    <td class="p-2.5">${v.total}</td>
+                    <td class="p-2.5 text-emerald-600 font-medium">${v.pagados}</td>
+                    <td class="p-2.5 font-semibold text-slate-900">$${v.monto.toLocaleString()}</td>
+                </tr>`;
+            }
+            html += `</tbody></table>`;
+            document.getElementById(containerId).innerHTML = html;
+        }
+
+        function clearFilters() {
+            document.getElementById("filter-search").value = "";
+            if (isAdmin) document.getElementById("filter-vendedor").value = "";
+            document.getElementById("filter-estatus").value = "";
+            renderTable();
+        }
+    </script>
+</body>
+</html>
