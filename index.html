@@ -530,26 +530,35 @@
     }
 
     function populateDropdowns() {
+      // Listas por defecto por si la hoja de Google Sheets viene vacía o incompleta
+      const defaultOrigenes = ["Campaña ADS", "Campaña Facebook", "Campaña Instagram", "Campaña SEO", "Llamada", "Prospección", "Google Maps", "Campaña Tik Tok"];
+      const defaultSolicitudes = ["Renta", "Venta", "Mantenimiento", "Suministro de diésel", "Instalación o maniobra", "SNI"];
+      const defaultVendedores = ["Angel", "Ana", "Brenda", "Dayana", "Fabi", "Jorge"];
+
+      let origenes = (rawData.listas && rawData.listas.origenes && rawData.listas.origenes.length > 0) ? rawData.listas.origenes : defaultOrigenes;
+      let solicitudes = (rawData.listas && rawData.listas.solicitudes && rawData.listas.solicitudes.length > 0) ? rawData.listas.solicitudes : defaultSolicitudes;
+      let vendedores = (rawData.listas && rawData.listas.vendedores && rawData.listas.vendedores.length > 0) ? rawData.listas.vendedores.filter(v => v !== "Sin información") : defaultVendedores;
+
       if (isAdmin) {
         let fv = document.getElementById("filter-vendedor");
         fv.innerHTML = '<option value="">Todos los vendedores</option>';
-        rawData.listas.vendedores.forEach(v => fv.innerHTML += `<option value="${v}">${v}</option>`);
+        vendedores.forEach(v => fv.innerHTML += `<option value="${v}">${v}</option>`);
       }
 
       let fo = document.getElementById("form-etiqueta");
       fo.innerHTML = "";
-      rawData.listas.origenes.forEach(o => fo.innerHTML += `<option value="${o}">${o}</option>`);
+      origenes.forEach(o => fo.innerHTML += `<option value="${o}">${o}</option>`);
 
       let fs = document.getElementById("form-solicitud");
       fs.innerHTML = "";
-      rawData.listas.solicitudes.forEach(s => fs.innerHTML += `<option value="${s}">${s}</option>`);
+      solicitudes.forEach(s => fs.innerHTML += `<option value="${s}">${s}</option>`);
 
       let fvForm = document.getElementById("form-vendedor");
       fvForm.innerHTML = "";
-      rawData.listas.vendedores.forEach(v => fvForm.innerHTML += `<option value="${v}">${v}</option>`);
+      vendedores.forEach(v => fvForm.innerHTML += `<option value="${v}">${v}</option>`);
 
       if (!isAdmin) {
-        if (!rawData.listas.vendedores.some(v => v.toLowerCase() === paramVendedor.toLowerCase())) {
+        if (!vendedores.some(v => v.toLowerCase() === paramVendedor.toLowerCase())) {
           fvForm.innerHTML += `<option value="${paramVendedor}">${paramVendedor}</option>`;
         }
         fvForm.value = paramVendedor;
@@ -622,26 +631,25 @@
       document.getElementById("form-nuevo-comentario").value = "";
 
       if (lead) {
-        // MODO EDICIÓN: La fecha queda bloqueada (fija)
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
         inputFecha.value = formatDateClean(lead.fecha);
         inputFecha.readOnly = true;
         labelFecha.innerText = "Fecha de creación (Fija)";
 
-        document.getElementById("form-etiqueta").value = lead.etiqueta;
-        document.getElementById("form-empresa").value = lead.empresa;
-        document.getElementById("form-nombre").value = lead.nombre_cliente;
-        document.getElementById("form-estado").value = lead.estado;
-        document.getElementById("form-telefono").value = lead.telefono;
-        document.getElementById("form-email").value = lead.email;
-        document.getElementById("form-solicitud").value = lead.solicitud;
-        document.getElementById("form-capacidad").value = lead.capacidad;
-        document.getElementById("form-cotizacion").value = lead.cotizacion;
-        document.getElementById("form-vendedor").value = isAdmin ? lead.vendedor : paramVendedor;
+        document.getElementById("form-etiqueta").value = lead.etiqueta || "";
+        document.getElementById("form-empresa").value = lead.empresa || "";
+        document.getElementById("form-nombre").value = lead.nombre_cliente || "";
+        document.getElementById("form-estado").value = lead.estado || "";
+        document.getElementById("form-telefono").value = lead.telefono || "";
+        document.getElementById("form-email").value = lead.email || "";
+        document.getElementById("form-solicitud").value = lead.solicitud || "";
+        document.getElementById("form-capacidad").value = lead.capacidad || "";
+        document.getElementById("form-cotizacion").value = lead.cotizacion || "";
+        document.getElementById("form-vendedor").value = isAdmin ? (lead.vendedor || "") : paramVendedor;
         document.getElementById("form-estatus").value = lead.estatus || "Desarrollo (10%)";
-        document.getElementById("form-monto-mxn").value = lead.monto_mxn;
-        document.getElementById("form-monto-usd").value = lead.monto_usd;
+        document.getElementById("form-monto-mxn").value = lead.monto_mxn || 0;
+        document.getElementById("form-monto-usd").value = lead.monto_usd || 0;
 
         if (lead.observaciones && lead.observaciones.trim() !== "") {
           lead.observaciones.split("\n\n").forEach(item => {
@@ -651,7 +659,6 @@
           historial.innerHTML = `<span style="color:var(--text-secondary);">Sin comentarios previos.</span>`;
         }
       } else {
-        // MODO NUEVO LEAD: La fecha SÍ se puede editar libremente
         document.getElementById("modal-title").innerText = "Registrar Nuevo Lead";
         document.getElementById("lead-form").reset();
         document.getElementById("form-no").value = "";
@@ -749,7 +756,7 @@
         if (clean !== "-") {
           let parts = clean.split('-');
           if (parts.length === 3) {
-            let d = new Date(parts[0], parts[1] - 1, parts[2]).getDay(); // 1=Lun ... 5=Vie
+            let d = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
             if (d >= 1 && d <= 5) dayCounts[d - 1]++;
           }
         }
@@ -803,9 +810,9 @@
 
       renderMetricList("etiqueta", "channelList");
 
-      const vendedoresList = rawData.listas.vendedores.filter(v => v !== "Sin información");
+      const vendedoresList = ["Angel", "Ana", "Brenda", "Dayana", "Fabi", "Jorge"];
       document.getElementById("sellerList").innerHTML = vendedoresList.map(s => {
-        const sItems = visibleLeads.filter(l => l.vendedor === s);
+        const sItems = visibleLeads.filter(l => String(l.vendedor).trim().toLowerCase() === s.toLowerCase());
         const pct = total ? Math.round((sItems.length / total) * 100) : 0;
         const rCnt = sItems.filter(l => l.solicitud === "Renta").length;
         const vCnt = sItems.filter(l => l.solicitud === "Venta").length;
@@ -820,7 +827,7 @@
             </div>
           </div>
         `;
-      }).join("") || `<span style="color:var(--text-secondary); font-size:12px;">Sin asesores</span>`;
+      }).join("");
 
       const fases = ["Desarrollo (10%)", "Cotización (30%)", "Recotización (50%)", "Orden de compra (80%)", "Pagado (100%)"];
       document.getElementById("phaseMetricList").innerHTML = fases.map(f => {
