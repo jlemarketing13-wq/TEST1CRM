@@ -53,13 +53,14 @@
     h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; color: var(--text-primary); }
 
     .btn-apple {
-      background: var(--text-primary); color: #fff; border: none; padding: 8px 16px;
+      background: var(--text-primary); color: #fff; border: none; padding: 9px 18px;
       border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
     }
     .btn-apple:hover { opacity: 0.85; }
+    .btn-apple:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary {
       background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
-      padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer;
+      padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer;
     }
 
     /* Pestañas */
@@ -81,7 +82,6 @@
     .kpi-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
     .kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
     .kpi-sub { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-    .kpi-sub strong { color: var(--accent); font-weight: 600; }
 
     /* Controles y Tablas */
     .controls-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
@@ -142,17 +142,44 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     .legend-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    /* Modal Form */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .modal-card { background: var(--surface); width: 100%; max-width: 640px; max-height: 90vh; border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; }
-    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .modal-body { padding: 20px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    /* Modal Form con scroll interno y pie siempre visible */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+      z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px;
+    }
+    .modal-card {
+      background: var(--surface); width: 100%; max-width: 640px; max-height: 88vh;
+      border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+    }
+    #lead-form {
+      display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
+    }
+    .modal-body {
+      padding: 18px 20px; overflow-y: auto; flex: 1;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    @media (max-width: 540px) {
+      .modal-body { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: span 1 !important; }
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
     .form-group.full { grid-column: span 2; }
     .form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-    .form-input { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-secondary); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit; }
+    .form-input {
+      padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      background: var(--surface-secondary); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit;
+    }
     .form-input:focus { background: var(--surface); border-color: var(--accent); }
-    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-secondary); display: flex; justify-content: flex-end; gap: 8px; }
+    .form-input[readonly] { background: #E5E5EA; color: var(--text-secondary); cursor: not-allowed; }
+    .modal-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-secondary);
+      display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
+    }
 
     .hidden { display: none !important; }
   </style>
@@ -228,7 +255,7 @@
             <thead>
               <tr>
                 <th>No.</th>
-                <th>Creación (Fija)</th>
+                <th>Creación</th>
                 <th>Empresa / Cliente</th>
                 <th>Origen</th>
                 <th>Solicitud</th>
@@ -312,15 +339,15 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="modal-title" style="font-size: 16px; font-weight: 600;">Registrar Nuevo Lead</h3>
-        <button onclick="closeModal()" style="background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-secondary);">&times;</button>
+        <button type="button" onclick="closeModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-secondary);">&times;</button>
       </div>
       <form id="lead-form" onsubmit="saveLead(event)">
         <div class="modal-body">
           <input type="hidden" id="form-no">
           
           <div class="form-group">
-            <label class="form-label">Fecha de creación (Fija)</label>
-            <input type="date" id="form-fecha" class="form-input" readonly required>
+            <label class="form-label" id="label-fecha">Fecha de creación</label>
+            <input type="date" id="form-fecha" class="form-input" required>
           </div>
           
           <div class="form-group">
@@ -396,12 +423,12 @@
 
           <div class="form-group full">
             <label class="form-label">Historial de Comentarios y Bitácora</label>
-            <div id="form-historial-observaciones" style="background: var(--surface-secondary); padding: 10px; border-radius: var(--radius-sm); font-size: 12px; max-height: 100px; overflow-y: auto; margin-bottom: 8px;"></div>
+            <div id="form-historial-observaciones" style="background: var(--surface-secondary); padding: 10px; border-radius: var(--radius-sm); font-size: 12px; max-height: 90px; overflow-y: auto; margin-bottom: 6px;"></div>
             <label class="form-label">Agregar nuevo comentario / movimiento:</label>
             <input type="text" id="form-nuevo-comentario" class="form-input" placeholder="Escribe detalles del avance...">
           </div>
-
         </div>
+
         <div class="modal-footer">
           <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
           <button type="submit" id="btn-submit-lead" class="btn-apple">Guardar Registro</button>
@@ -411,8 +438,8 @@
   </div>
 
   <script>
-    // CAMBIA ESTA URL POR TU ENLACE DE GOOGLE APPS SCRIPT TERMINADO EN /exec
-    const API_URL = "https://script.google.com/macros/s/AKfycbyH6XsFm9512qFeViEdXsXe7MZQh7yZum9dnQCoIgI5iq8io9vEzf6XWVLPXbtjW6gV/exec";
+    // CAMBIA ESTA URL POR TU ENLACE DE GOOGLE APPS SCRIPT TERMINADO EN /exec (Línea 241)
+    const API_URL = "AQUÍ_PEGAR_URL_DE_WEB_APP";
 
     const urlParams = new URLSearchParams(window.location.search);
     const paramVendedor = urlParams.get('vendedor') || "ADMIN";
@@ -436,7 +463,7 @@
         title.innerText = "Consolidado Global del Equipo";
         document.getElementById("admin-vendedores-section").classList.remove("hidden");
       } else {
-        eyebrow.innerText = `Ejecutivo Comercial`;
+        eyebrow.innerText = "Ejecutivo Comercial";
         title.innerText = `Cartera de Leads de ${paramVendedor}`;
         document.getElementById("filter-vendedor").style.display = "none";
       }
@@ -522,6 +549,9 @@
       rawData.listas.vendedores.forEach(v => fvForm.innerHTML += `<option value="${v}">${v}</option>`);
 
       if (!isAdmin) {
+        if (!rawData.listas.vendedores.some(v => v.toLowerCase() === paramVendedor.toLowerCase())) {
+          fvForm.innerHTML += `<option value="${paramVendedor}">${paramVendedor}</option>`;
+        }
         fvForm.value = paramVendedor;
         fvForm.disabled = true;
       }
@@ -586,13 +616,19 @@
       document.getElementById("lead-modal").classList.remove("hidden");
       currentEditingLead = lead;
       let historial = document.getElementById("form-historial-observaciones");
+      let inputFecha = document.getElementById("form-fecha");
+      let labelFecha = document.getElementById("label-fecha");
       historial.innerHTML = "";
       document.getElementById("form-nuevo-comentario").value = "";
 
       if (lead) {
+        // MODO EDICIÓN: La fecha queda bloqueada (fija)
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
-        document.getElementById("form-fecha").value = formatDateClean(lead.fecha);
+        inputFecha.value = formatDateClean(lead.fecha);
+        inputFecha.readOnly = true;
+        labelFecha.innerText = "Fecha de creación (Fija)";
+
         document.getElementById("form-etiqueta").value = lead.etiqueta;
         document.getElementById("form-empresa").value = lead.empresa;
         document.getElementById("form-nombre").value = lead.nombre_cliente;
@@ -615,10 +651,14 @@
           historial.innerHTML = `<span style="color:var(--text-secondary);">Sin comentarios previos.</span>`;
         }
       } else {
+        // MODO NUEVO LEAD: La fecha SÍ se puede editar libremente
         document.getElementById("modal-title").innerText = "Registrar Nuevo Lead";
         document.getElementById("lead-form").reset();
         document.getElementById("form-no").value = "";
-        document.getElementById("form-fecha").value = new Date().toISOString().split('T')[0];
+        inputFecha.value = new Date().toISOString().split('T')[0];
+        inputFecha.readOnly = false;
+        labelFecha.innerText = "Fecha de creación";
+
         document.getElementById("form-estatus").value = "Desarrollo (10%)";
         historial.innerHTML = `<span style="color:var(--text-secondary);">El historial se creará al guardar.</span>`;
         if (!isAdmin) document.getElementById("form-vendedor").value = paramVendedor;
@@ -702,15 +742,18 @@
       const total = visibleLeads.length;
       document.getElementById("reqTotalLabel").textContent = `${total} registros`;
 
-      // 1. Gráfico vertical diario (Lun - Vie)
       const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
-      const dayCounts = [
-        Math.round(total * 0.15),
-        Math.round(total * 0.25),
-        Math.round(total * 0.20),
-        Math.round(total * 0.20),
-        Math.round(total * 0.20)
-      ];
+      const dayCounts = [0, 0, 0, 0, 0];
+      visibleLeads.forEach(l => {
+        let clean = formatDateClean(l.fecha);
+        if (clean !== "-") {
+          let parts = clean.split('-');
+          if (parts.length === 3) {
+            let d = new Date(parts[0], parts[1] - 1, parts[2]).getDay(); // 1=Lun ... 5=Vie
+            if (d >= 1 && d <= 5) dayCounts[d - 1]++;
+          }
+        }
+      });
       const maxDay = Math.max(...dayCounts, 1);
 
       document.getElementById("dailyChart").innerHTML = days.map((d, i) => {
@@ -728,7 +771,6 @@
         `;
       }).join("");
 
-      // 2. Tipo de Solicitud (Barra segmentada y leyenda)
       const rentaCount = visibleLeads.filter(l => l.solicitud === "Renta").length;
       const ventaCount = visibleLeads.filter(l => l.solicitud === "Venta").length;
       const otrosCount = total - rentaCount - ventaCount;
@@ -759,10 +801,8 @@
         </div>
       `;
 
-      // 3. Origen de Captación
       renderMetricList("etiqueta", "channelList");
 
-      // 4. Carga por Asesor (con subtotales de Renta y Venta)
       const vendedoresList = rawData.listas.vendedores.filter(v => v !== "Sin información");
       document.getElementById("sellerList").innerHTML = vendedoresList.map(s => {
         const sItems = visibleLeads.filter(l => l.vendedor === s);
@@ -782,7 +822,6 @@
         `;
       }).join("") || `<span style="color:var(--text-secondary); font-size:12px;">Sin asesores</span>`;
 
-      // 5. Progreso de Fases del Embudo
       const fases = ["Desarrollo (10%)", "Cotización (30%)", "Recotización (50%)", "Orden de compra (80%)", "Pagado (100%)"];
       document.getElementById("phaseMetricList").innerHTML = fases.map(f => {
         const cnt = visibleLeads.filter(l => (l.estatus || "Desarrollo (10%)") === f).length;
@@ -800,7 +839,6 @@
         `;
       }).join("");
 
-      // 6. Tabla Financiera para Dirección (Admin)
       if (isAdmin) {
         let vMap = {};
         vendedoresList.forEach(v => vMap[v] = { total: 0, pagados: 0, monto: 0 });
