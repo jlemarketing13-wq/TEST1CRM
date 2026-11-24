@@ -568,7 +568,6 @@
     function formatDateClean(dateStr) {
       if (!dateStr) return "";
       
-      // Si Google Sheets envía un objeto Date serializado (ej. {year: 2023, month: 11, day: 24})
       if (typeof dateStr === 'object' && !(dateStr instanceof Date)) {
         if (dateStr.year && dateStr.month && dateStr.day) {
           let m = String(dateStr.month).padStart(2, '0');
@@ -584,19 +583,16 @@
       let str = String(dateStr).trim();
       if (str === "-" || str === "") return "";
 
-      // Formato ISO (2023-11-24T06:00:00.000Z)
       if (str.includes('T')) {
         let d = new Date(str);
         if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
       }
       
-      // Formato Google Script (Thu Nov 24 2023...)
       if (str.includes("GMT")) {
         let d = new Date(str);
         if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
       }
 
-      // Formato con Slash (24/11/2023)
       if (str.includes('/')) {
         let parts = str.split(' ')[0].split('/');
         if (parts.length === 3) {
@@ -608,7 +604,6 @@
         }
       }
 
-      // Formato con Guion (YYYY-MM-DD)
       if (str.includes('-')) {
         let parts = str.split('T')[0].split(' ')[0].split('-');
         if (parts.length === 3) {
@@ -726,7 +721,6 @@
       }
 
       filtered.forEach(l => {
-        // Ahora muestra "24 Nov 2023" o "Sin fecha", nunca un guión
         let fechaShow = formatDateForDisplay(l.fecha); 
         
         tbody.innerHTML = `
@@ -782,7 +776,6 @@
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
         
-        // BLINDAJE: En edición usamos un input de texto seguro
         let fClean = formatDateClean(lead.fecha);
         let fDisplay = formatDateForDisplay(lead.fecha);
         
@@ -790,7 +783,7 @@
         inputFecha.required = false;
         inputFechaText.classList.remove("hidden");
         inputFechaText.value = fDisplay;
-        inputFechaText.dataset.raw = fClean; // Guardamos "YYYY-MM-DD" en el dataset
+        inputFechaText.dataset.raw = fClean; 
         labelFecha.innerText = "Fecha de creación (Fija)";
 
         const targetEtiqueta = lead.etiqueta || "";
@@ -828,7 +821,6 @@
         document.getElementById("lead-form").reset();
         document.getElementById("form-no").value = "";
         
-        // Modo creación: Mostrar input tipo date normal
         inputFecha.classList.remove("hidden");
         inputFecha.required = true;
         inputFechaText.classList.add("hidden");
@@ -871,60 +863,56 @@
       btn.innerText = "Guardando...";
       showLoading("Guardando cambios...");
 
-      let nuevoComentario = document.getElementById("form-nuevo-comentario").value.trim();
-      let observacionesActuales = currentEditingLead ? (currentEditingLead.observaciones || "") : "";
-
-      if (nuevoComentario !== "") {
-        let fechaHoy = new Date().toISOString().split('T')[0];
-        let horaActual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        let autor = isAdmin ? "Dirección" : paramVendedor;
-        let entrada = `[${fechaHoy} ${horaActual} - ${autor}]: ${nuevoComentario}`;
-        observacionesActuales = observacionesActuales ? (observacionesActuales + "\n\n" + entrada) : entrada;
-      }
-
-      const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
-      const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
-
-      // BLINDAJE DE ENVÍO DE FECHA
-      let fechaFinal = "";
-      if (currentEditingLead) {
-        // En edición, leer el valor puro del dataset del input de texto
-        fechaFinal = document.getElementById("form-fecha-text").dataset.raw;
-        // Si por lo que sea está vacío, usar el respaldo del lead original
-        if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-          fechaFinal = formatDateClean(currentEditingLead.fecha);
-        }
-      } else {
-        // En creación, leer el input de date
-        fechaFinal = document.getElementById("form-fecha").value;
-      }
-
-      // Si aun así está vacío, usar la fecha actual como último recurso
-      if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-        fechaFinal = new Date().toISOString().split('T')[0];
-      }
-
-      let leadData = {
-        no: document.getElementById("form-no").value,
-        fecha: fechaFinal, // <-- Fecha de creación totalmente independiente
-        etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
-        empresa: document.getElementById("form-empresa").value,
-        nombre_cliente: document.getElementById("form-nombre").value,
-        estado: document.getElementById("form-estado").value,
-        telefono: document.getElementById("form-telefono").value,
-        email: document.getElementById("form-email").value,
-        solicitud: document.getElementById("form-solicitud").value,
-        capacidad: document.getElementById("form-capacidad").value,
-        cotizacion: document.getElementById("form-cotizacion").value,
-        vendedor: isAdmin ? (selectedVendedor ? selectedVendedor.value : "") : paramVendedor,
-        estatus: document.getElementById("form-estatus").value,
-        ultimo_seguimiento: new Date().toISOString().split('T')[0], // <-- Fecha de modificación separada
-        monto_mxn: document.getElementById("form-monto-mxn").value,
-        monto_usd: document.getElementById("form-monto-usd").value,
-        observaciones: observacionesActuales
-      };
-
       try {
+        let nuevoComentario = document.getElementById("form-nuevo-comentario").value.trim();
+        let observacionesActuales = currentEditingLead ? (currentEditingLead.observaciones || "") : "";
+
+        if (nuevoComentario !== "") {
+          let fechaHoy = new Date().toISOString().split('T')[0];
+          let horaActual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          let autor = isAdmin ? "Dirección" : paramVendedor;
+          let entrada = `[${fechaHoy} ${horaActual} - ${autor}]: ${nuevoComentario}`;
+          observacionesActuales = observacionesActuales ? (observacionesActuales + "\n\n" + entrada) : entrada;
+        }
+
+        const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
+        const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
+
+        // LÓGICA CORREGIDA PARA LA FECHA
+        let fechaFinal = "";
+        if (currentEditingLead) {
+          fechaFinal = document.getElementById("form-fecha-text").dataset.raw;
+          if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
+            fechaFinal = formatDateClean(currentEditingLead.fecha);
+          }
+        } else {
+          fechaFinal = document.getElementById("form-fecha").value;
+        }
+
+        if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
+          fechaFinal = new Date().toISOString().split('T')[0];
+        }
+
+        let leadData = {
+          no: document.getElementById("form-no").value,
+          fecha: fechaFinal, 
+          etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
+          empresa: document.getElementById("form-empresa").value,
+          nombre_cliente: document.getElementById("form-nombre").value,
+          estado: document.getElementById("form-estado").value,
+          telefono: document.getElementById("form-telefono").value,
+          email: document.getElementById("form-email").value,
+          solicitud: document.getElementById("form-solicitud").value,
+          capacidad: document.getElementById("form-capacidad").value,
+          cotizacion: document.getElementById("form-cotizacion").value,
+          vendedor: isAdmin ? (selectedVendedor ? selectedVendedor.value : "") : paramVendedor,
+          estatus: document.getElementById("form-estatus").value,
+          ultimo_seguimiento: new Date().toISOString().split('T')[0], 
+          monto_mxn: document.getElementById("form-monto-mxn").value,
+          monto_usd: document.getElementById("form-monto-usd").value,
+          observaciones: observacionesActuales
+        };
+
         let res = await fetch(API_URL, {
           method: "POST",
           body: JSON.stringify({ action: "saveLead", lead: leadData })
@@ -934,11 +922,11 @@
           closeModal();
           await loadData();
         } else {
-          alert("Error: " + result.message);
+          alert("Error del servidor: " + result.message);
         }
       } catch (err) {
         console.error(err);
-        alert("Error de conexión al guardar.");
+        alert("Hubo un error al procesar el guardado. Revisa la consola.");
       } finally {
         isSaving = false;
         btn.disabled = false;
