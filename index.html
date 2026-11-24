@@ -389,9 +389,7 @@
           
           <div class="form-group">
             <label class="form-label" id="label-fecha">Fecha de creación</label>
-            <!-- Input de fecha para CREACIÓN -->
             <input type="date" id="form-fecha" class="form-input" required>
-            <!-- Input de texto para EDICIÓN (Blindado) -->
             <input type="text" id="form-fecha-text" class="form-input hidden" readonly>
           </div>
           
@@ -483,7 +481,6 @@
   </div>
 
   <script>
-    // CAMBIA ESTA URL POR TU ENLACE DE GOOGLE APPS SCRIPT TERMINADO EN /exec
     const API_URL = "https://script.google.com/macros/s/AKfycbyH6XsFm9512qFeViEdXsXe7MZQh7yZum9dnQCoIgI5iq8io9vEzf6XWVLPXbtjW6gV/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -564,59 +561,61 @@
       hideLoading();
     }
 
-    // --- BLINDAJE TOTAL DE FECHAS ---
-    function formatDateClean(dateStr) {
+    // --- EXTRACTOR MATEMÁTICO DE FECHAS (A PRUEBA DE BALAS) ---
+    function extractDate(dateStr) {
       if (!dateStr) return "";
       
+      // Si Google envía un objeto con año, mes y día
       if (typeof dateStr === 'object' && !(dateStr instanceof Date)) {
         if (dateStr.year && dateStr.month && dateStr.day) {
-          let m = String(dateStr.month).padStart(2, '0');
-          let d = String(dateStr.day).padStart(2, '0');
-          return `${dateStr.year}-${m}-${d}`;
+           let m = String(dateStr.month).padStart(2, '0');
+           let d = String(dateStr.day).padStart(2, '0');
+           return `${dateStr.year}-${m}-${d}`;
         }
       }
       
+      // Si es un objeto Date puro de JS
       if (dateStr instanceof Date) {
         return dateStr.toISOString().split('T')[0];
       }
 
       let str = String(dateStr).trim();
-      if (str === "-" || str === "") return "";
+      if (str === "-" || str === "" || str === "null" || str === "undefined") return "";
 
-      if (str.includes('T')) {
-        let d = new Date(str);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      // Buscar el patrón AÑO-MES-DÍA (ej. 2023-11-24)
+      let matchYMD = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (matchYMD) {
+        let y = matchYMD[1];
+        let m = matchYMD[2].padStart(2, '0');
+        let d = matchYMD[3].padStart(2, '0');
+        return `${y}-${m}-${d}`;
       }
+
+      // Buscar el patrón DÍA-MES-AÑO (ej. 24/11/2023 o 24-11-2023)
+      let matchDMY = str.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (matchDMY) {
+        let d = matchDMY[1].padStart(2, '0');
+        let m = matchDMY[2].padStart(2, '0');
+        let y = matchDMY[3];
+        return `${y}-${m}-${d}`;
+      }
+
+      // Si tiene el formato ISO (contiene T, ej. 2023-11-24T06:00:00Z)
+      // Ya lo capturamos arriba con matchYMD.
       
-      if (str.includes("GMT")) {
-        let d = new Date(str);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-      }
-
-      if (str.includes('/')) {
-        let parts = str.split(' ')[0].split('/');
-        if (parts.length === 3) {
-          let dia = parts[0].padStart(2, '0');
-          let mes = parts[1].padStart(2, '0');
-          let anio = parts[2];
-          if (anio.length === 2) anio = "20" + anio;
-          return `${anio}-${mes}-${dia}`;
-        }
-      }
-
-      if (str.includes('-')) {
-        let parts = str.split('T')[0].split(' ')[0].split('-');
-        if (parts.length === 3) {
-          if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-          if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
+      // Fallback al parser de Date nativo
+      let d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        // Ajustar zona horaria para que no reste un día
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
       }
 
       return "";
     }
 
     function formatDateForDisplay(dateStr) {
-      let clean = formatDateClean(dateStr);
+      let clean = extractDate(dateStr);
       if (!clean) return "Sin fecha";
       
       let parts = clean.split('-');
@@ -776,7 +775,7 @@
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
         
-        let fClean = formatDateClean(lead.fecha);
+        let fClean = extractDate(lead.fecha);
         let fDisplay = formatDateForDisplay(lead.fecha);
         
         inputFecha.classList.add("hidden");
@@ -878,12 +877,11 @@
         const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
         const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
 
-        // LÓGICA CORREGIDA PARA LA FECHA
         let fechaFinal = "";
         if (currentEditingLead) {
           fechaFinal = document.getElementById("form-fecha-text").dataset.raw;
           if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-            fechaFinal = formatDateClean(currentEditingLead.fecha);
+            fechaFinal = extractDate(currentEditingLead.fecha);
           }
         } else {
           fechaFinal = document.getElementById("form-fecha").value;
@@ -942,7 +940,7 @@
       const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
       const dayCounts = [0, 0, 0, 0, 0];
       visibleLeads.forEach(l => {
-        let clean = formatDateClean(l.fecha);
+        let clean = extractDate(l.fecha);
         if (clean) {
           let parts = clean.split('-');
           if (parts.length === 3) {
