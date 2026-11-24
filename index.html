@@ -93,47 +93,34 @@
     }
     .search-input:focus, .select-input:focus { background: var(--surface); border-color: var(--accent); }
 
-    /* --- ESTILOS MODIFICADOS PARA SCROLL HORIZONTAL EN TABLA --- */
+    /* SCROLL HORIZONTAL PARA LA TABLA */
     .table-container { 
       overflow-x: auto; 
-      -webkit-overflow-scrolling: touch; /* Suavidad en iOS */
+      -webkit-overflow-scrolling: touch;
       width: 100%;
-      /* Pequeño gradiente en el borde derecho para indicar que hay más contenido */
       background: linear-gradient(to right, transparent 90%, rgba(0,0,0,0.03));
     }
-    
-    /* Personalizar la barra de scroll para navegadores Webkit (Chrome, Safari, Edge) */
-    .table-container::-webkit-scrollbar {
-      height: 6px;
-    }
-    .table-container::-webkit-scrollbar-track {
-      background: var(--surface-secondary);
-      border-radius: 10px;
-    }
-    .table-container::-webkit-scrollbar-thumb {
-      background: var(--text-tertiary);
-      border-radius: 10px;
-    }
-    .table-container::-webkit-scrollbar-thumb:hover {
-      background: var(--text-secondary);
-    }
+    .table-container::-webkit-scrollbar { height: 6px; }
+    .table-container::-webkit-scrollbar-track { background: var(--surface-secondary); border-radius: 10px; }
+    .table-container::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 10px; }
+    .table-container::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
     table { 
       width: 100%; 
       border-collapse: collapse; 
       text-align: left; 
       font-size: 13px; 
-      min-width: 900px; /* Forzar ancho mínimo para que no se comprima y requiera scroll */
+      min-width: 900px;
     }
     th { 
       font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
       color: var(--text-secondary); padding: 10px 12px; border-bottom: 1px solid var(--border); 
       background: var(--surface-secondary); 
-      white-space: nowrap; /* Evita que los títulos se partan en 2 líneas */
+      white-space: nowrap;
     }
     td { 
       padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); 
-      white-space: nowrap; /* EVITA QUE LOS DATOS SE CORTEN EN 2 RENGLONES */
+      white-space: nowrap;
     }
     tr:hover td { background: rgba(0,0,0,0.01); }
 
@@ -180,7 +167,7 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     .legend-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    /* Modal Form con scroll interno y pie siempre visible */
+    /* Modal Form */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
       z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px;
@@ -215,7 +202,7 @@
     .form-input:focus { background: var(--surface); border-color: var(--accent); }
     .form-input[readonly] { background: #E5E5EA; color: var(--text-secondary); cursor: not-allowed; }
     
-    /* Estilos para los Radio Buttons */
+    /* Radio Buttons */
     .radio-group {
       display: flex; flex-direction: column; gap: 2px;
       max-height: 140px; overflow-y: auto;
@@ -259,13 +246,11 @@
       </div>
     </header>
 
-    <!-- Pestañas -->
     <div class="filter-bar">
       <button class="filter-btn active" onclick="switchTab('leads')" id="tab-leads">Registro y Cartera</button>
       <button class="filter-btn" onclick="switchTab('dashboard')" id="tab-dashboard">Dashboard y Reporte Semanal</button>
     </div>
 
-    <!-- VISTA 1: REGISTRO Y CARTERA -->
     <div id="view-leads">
       <section class="kpi-grid">
         <div class="card" style="margin-bottom:0;">
@@ -333,7 +318,6 @@
       </div>
     </div>
 
-    <!-- VISTA 2: DASHBOARD Y REPORTE SEMANAL -->
     <div id="view-dashboard" class="hidden space-y-6">
       <section class="grid-2">
         <div class="card" style="margin-bottom:0;">
@@ -393,7 +377,6 @@
 
   </div>
 
-  <!-- MODAL DE GESTIÓN -->
   <div id="lead-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -406,7 +389,6 @@
           
           <div class="form-group">
             <label class="form-label" id="label-fecha">Fecha de creación</label>
-            <!-- Se agregó step="1" y se manejará con JS para no perder el valor -->
             <input type="date" id="form-fecha" class="form-input" required>
           </div>
           
@@ -579,14 +561,58 @@
       hideLoading();
     }
 
+    // --- FIX DEFINITIVO PARA LA FECHA ---
     function formatDateClean(dateStr) {
       if (!dateStr) return "-";
-      let clean = String(dateStr).split('T')[0];
-      if (clean.includes("GMT") || clean.length > 12) {
-        let d = new Date(dateStr);
-        if (!isNaN(d)) return d.toISOString().split('T')[0];
+      
+      // Si Google Sheets lo envía como un objeto en lugar de texto
+      if (typeof dateStr === 'object') {
+        if (dateStr instanceof Date) {
+          return dateStr.toISOString().split('T')[0];
+        }
+        return "-"; // Si es un objeto vacío {} que no podemos leer
       }
-      return clean;
+
+      // Convertir a string por si acaso
+      let str = String(dateStr).trim();
+
+      // Si viene en formato ISO (ej. 2023-11-24T06:00:00.000Z)
+      if (str.includes('T')) {
+        let d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0];
+        }
+      }
+
+      // Si viene con la palabra "GMT" (común en Google Apps Script al usar .toString())
+      if (str.includes("GMT")) {
+        let d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          // Ajuste opcional por zona horaria para que no reste un día
+          return d.toISOString().split('T')[0];
+        }
+      }
+
+      // Si viene con slash (ej. 24/11/2023)
+      if (str.includes('/')) {
+        let parts = str.split(' ')[0].split('/'); // Tomar solo la fecha, ignorar hora
+        if (parts.length === 3) {
+          // Asumimos formato DD/MM/YYYY
+          let dia = parts[0].padStart(2, '0');
+          let mes = parts[1].padStart(2, '0');
+          let anio = parts[2];
+          // Si el año tiene 2 dígitos, lo pasamos a 4 (ej. 23 -> 2023)
+          if (anio.length === 2) anio = "20" + anio; 
+          return `${anio}-${mes}-${dia}`;
+        }
+      }
+
+      // Si ya viene perfecta (ej. 2023-11-24)
+      if (str.includes('-')) {
+        return str.split('T')[0].split(' ')[0];
+      }
+
+      return str.substring(0, 10); // Intento final
     }
 
     function populateDropdowns() {
@@ -730,7 +756,7 @@
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
         
-        // FIX: Forzar asignación de la fecha con el formato correcto
+        // Usar la función de formateo blindada
         inputFecha.value = formatDateClean(lead.fecha);
         inputFecha.readOnly = true;
         labelFecha.innerText = "Fecha de creación (Fija)";
@@ -823,7 +849,6 @@
       const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
       const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
 
-      // FIX: Obtener la fecha de forma segura y forzar su conservación
       let fechaFinal = document.getElementById("form-fecha").value;
       if (!fechaFinal && currentEditingLead) {
         fechaFinal = formatDateClean(currentEditingLead.fecha);
@@ -831,7 +856,7 @@
 
       let leadData = {
         no: document.getElementById("form-no").value,
-        fecha: fechaFinal, // <-- Usamos la variable asegurada
+        fecha: fechaFinal, 
         etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
         empresa: document.getElementById("form-empresa").value,
         nombre_cliente: document.getElementById("form-nombre").value,
