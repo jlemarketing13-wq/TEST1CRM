@@ -110,7 +110,7 @@
       border-collapse: collapse; 
       text-align: left; 
       font-size: 13px; 
-      min-width: 900px;
+      min-width: 1100px; /* Más ancho por las nuevas columnas */
     }
     th { 
       font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
@@ -200,7 +200,6 @@
       background: var(--surface-secondary); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit;
     }
     .form-input:focus { background: var(--surface); border-color: var(--accent); }
-    .form-input[readonly] { background: #E5E5EA; color: var(--text-secondary); cursor: not-allowed; }
     
     /* Radio Buttons */
     .radio-group {
@@ -300,7 +299,9 @@
               <tr>
                 <th>No.</th>
                 <th>Creación</th>
-                <th>Empresa / Cliente</th>
+                <th>Empresa</th>
+                <th>Cliente</th>
+                <th>Teléfono</th>
                 <th>Origen</th>
                 <th>Solicitud</th>
                 <th>Cotización</th>
@@ -311,7 +312,7 @@
               </tr>
             </thead>
             <tbody id="leads-table-body">
-              <tr><td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 24px;">Cargando registros...</td></tr>
+              <tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 24px;">Cargando registros...</td></tr>
             </tbody>
           </table>
         </div>
@@ -389,8 +390,8 @@
           
           <div class="form-group">
             <label class="form-label" id="label-fecha">Fecha de creación</label>
-            <input type="date" id="form-fecha" class="form-input" required>
-            <input type="text" id="form-fecha-text" class="form-input hidden" readonly>
+            <!-- AHORA ES TEXTO MANUAL -->
+            <input type="text" id="form-fecha" class="form-input" placeholder="Ej. 24/11/2023" required>
           </div>
           
           <div class="form-group">
@@ -561,52 +562,75 @@
       hideLoading();
     }
 
-    // --- EXTRACTOR MATEMÁTICO DE FECHAS (A PRUEBA DE BALAS) ---
+    // --- EXTRACTOR DE FECHAS SUPREMO ---
     function extractDate(dateStr) {
-      if (!dateStr) return "";
+      if (dateStr === undefined || dateStr === null) return "";
       
-      // Si Google envía un objeto con año, mes y día
-      if (typeof dateStr === 'object' && !(dateStr instanceof Date)) {
+      // 1. Si es un número (fecha serial de Excel/Sheets)
+      if (typeof dateStr === 'number' || (!isNaN(dateStr) && String(dateStr).trim() !== "" && String(dateStr).length < 8)) {
+        let d = new Date(Math.round((Number(dateStr) - 25569) * 86400 * 1000));
+        if (!isNaN(d.getTime())) {
+          // Ajustar para que no reste el día por zona horaria
+          d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+          return d.toISOString().split('T')[0];
+        }
+      }
+      
+      // 2. Si es un objeto Date o tiene propiedades de año, mes, día
+      if (dateStr instanceof Date) {
+        return dateStr.toISOString().split('T')[0];
+      }
+      if (typeof dateStr === 'object') {
         if (dateStr.year && dateStr.month && dateStr.day) {
            let m = String(dateStr.month).padStart(2, '0');
            let d = String(dateStr.day).padStart(2, '0');
            return `${dateStr.year}-${m}-${d}`;
         }
       }
-      
-      // Si es un objeto Date puro de JS
-      if (dateStr instanceof Date) {
-        return dateStr.toISOString().split('T')[0];
-      }
 
-      let str = String(dateStr).trim();
-      if (str === "-" || str === "" || str === "null" || str === "undefined") return "";
+      let str = String(dateStr).trim().toLowerCase();
+      if (str === "-" || str === "" || str === "null" || str === "undefined" || str === "sin fecha" || str === "n/a") return "";
+
+      // Limpiar palabras comunes ("de", "del")
+      str = str.replace(/\bde\b|\bdel\b/g, '').replace(/\s+/g, ' ').trim();
+
+      // Diccionario de meses en español e inglés
+      const meses = {
+        'ene': '01', 'enero': '01', 'jan': '01', 'january': '01',
+        'feb': '02', 'febrero': '02', 'february': '02',
+        'mar': '03', 'marzo': '03', 'march': '03',
+        'abr': '04', 'abril': '04', 'apr': '04', 'april': '04',
+        'may': '05', 'mayo': '05',
+        'jun': '06', 'junio': '06', 'june': '06',
+        'jul': '07', 'julio': '07', 'july': '07',
+        'ago': '08', 'agosto': '08', 'aug': '08', 'august': '08',
+        'sep': '09', 'septiembre': '09', 'september': '09',
+        'oct': '10', 'octubre': '10', 'october': '10',
+        'nov': '11', 'noviembre': '11', 'november': '11',
+        'dic': '12', 'diciembre': '12', 'dec': '12', 'december': '12'
+      };
+
+      // Reemplazar el nombre del mes por su número
+      for (let m in meses) {
+        let regex = new RegExp(`\\b${m}\\b`, 'g');
+        str = str.replace(regex, meses[m]);
+      }
 
       // Buscar el patrón AÑO-MES-DÍA (ej. 2023-11-24)
-      let matchYMD = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      let matchYMD = str.match(/(\d{4})[-/ ](\d{1,2})[-/ ](\d{1,2})/);
       if (matchYMD) {
-        let y = matchYMD[1];
-        let m = matchYMD[2].padStart(2, '0');
-        let d = matchYMD[3].padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        return `${matchYMD[1]}-${matchYMD[2].padStart(2, '0')}-${matchYMD[3].padStart(2, '0')}`;
       }
 
-      // Buscar el patrón DÍA-MES-AÑO (ej. 24/11/2023 o 24-11-2023)
-      let matchDMY = str.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      // Buscar el patrón DÍA-MES-AÑO (ej. 24/11/2023, 24-11-2023, 24 11 2023)
+      let matchDMY = str.match(/(\d{1,2})[-/ ](\d{1,2})[-/ ](\d{4})/);
       if (matchDMY) {
-        let d = matchDMY[1].padStart(2, '0');
-        let m = matchDMY[2].padStart(2, '0');
-        let y = matchDMY[3];
-        return `${y}-${m}-${d}`;
+        return `${matchDMY[3]}-${matchDMY[2].padStart(2, '0')}-${matchDMY[1].padStart(2, '0')}`;
       }
 
-      // Si tiene el formato ISO (contiene T, ej. 2023-11-24T06:00:00Z)
-      // Ya lo capturamos arriba con matchYMD.
-      
-      // Fallback al parser de Date nativo
+      // Fallback nativo
       let d = new Date(str);
       if (!isNaN(d.getTime())) {
-        // Ajustar zona horaria para que no reste un día
         d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
         return d.toISOString().split('T')[0];
       }
@@ -708,14 +732,14 @@
       let fFase = document.getElementById("filter-fase").value;
 
       let filtered = visibleLeads.filter(l => {
-        let matchS = (String(l.empresa) + " " + String(l.nombre_cliente) + " " + String(l.cotizacion)).toLowerCase().includes(search);
+        let matchS = (String(l.empresa) + " " + String(l.nombre_cliente) + " " + String(l.cotizacion) + " " + String(l.telefono)).toLowerCase().includes(search);
         let matchV = fVend === "" || l.vendedor === fVend;
         let matchF = fFase === "" || l.estatus === fFase;
         return matchS && matchV && matchF;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 24px;">No se encontraron registros.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-secondary); padding: 24px;">No se encontraron registros.</td></tr>`;
         return;
       }
 
@@ -726,10 +750,9 @@
           <tr>
             <td style="font-weight: 500; color: var(--text-secondary);">${l.no}</td>
             <td style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">${fechaShow}</td>
-            <td>
-              <div style="font-weight: 600;">${l.empresa || 'Sin empresa'}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">${l.nombre_cliente || ''}</div>
-            </td>
+            <td style="font-weight: 600;">${l.empresa || 'Sin empresa'}</td>
+            <td>${l.nombre_cliente || '-'}</td>
+            <td style="font-family: monospace;">${l.telefono || '-'}</td>
             <td>${l.etiqueta || '-'}</td>
             <td>${l.solicitud || '-'}</td>
             <td style="font-family: monospace;">${l.cotizacion || '-'}</td>
@@ -760,7 +783,6 @@
       currentEditingLead = lead;
       let historial = document.getElementById("form-historial-observaciones");
       let inputFecha = document.getElementById("form-fecha");
-      let inputFechaText = document.getElementById("form-fecha-text");
       let labelFecha = document.getElementById("label-fecha");
       
       historial.innerHTML = "";
@@ -776,14 +798,10 @@
         document.getElementById("form-no").value = lead.no;
         
         let fClean = extractDate(lead.fecha);
-        let fDisplay = formatDateForDisplay(lead.fecha);
-        
-        inputFecha.classList.add("hidden");
-        inputFecha.required = false;
-        inputFechaText.classList.remove("hidden");
-        inputFechaText.value = fDisplay;
-        inputFechaText.dataset.raw = fClean; 
-        labelFecha.innerText = "Fecha de creación (Fija)";
+        // Pasarlo a formato DD/MM/AAAA para el input de texto
+        inputFecha.value = fClean ? fClean.split('-').reverse().join('/') : "";
+        inputFecha.readOnly = false;
+        labelFecha.innerText = "Fecha de creación (Editable)";
 
         const targetEtiqueta = lead.etiqueta || "";
         document.getElementsByName("etiqueta").forEach(r => {
@@ -820,10 +838,8 @@
         document.getElementById("lead-form").reset();
         document.getElementById("form-no").value = "";
         
-        inputFecha.classList.remove("hidden");
-        inputFecha.required = true;
-        inputFechaText.classList.add("hidden");
-        inputFecha.value = new Date().toISOString().split('T')[0];
+        inputFecha.value = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        inputFecha.readOnly = false;
         labelFecha.innerText = "Fecha de creación";
 
         document.getElementById("form-estatus").value = "Desarrollo (10%)";
@@ -877,17 +893,17 @@
         const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
         const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
 
-        let fechaFinal = "";
-        if (currentEditingLead) {
-          fechaFinal = document.getElementById("form-fecha-text").dataset.raw;
-          if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-            fechaFinal = extractDate(currentEditingLead.fecha);
-          }
-        } else {
-          fechaFinal = document.getElementById("form-fecha").value;
+        // LÓGICA DE FECHA MANUAL
+        let rawFecha = document.getElementById("form-fecha").value;
+        let fechaFinal = extractDate(rawFecha);
+
+        // Si no se pudo interpretar lo que escribió, usar la fecha original
+        if (!fechaFinal && currentEditingLead) {
+          fechaFinal = extractDate(currentEditingLead.fecha);
         }
 
-        if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
+        // Si de plano no hay nada, usar hoy
+        if (!fechaFinal) {
           fechaFinal = new Date().toISOString().split('T')[0];
         }
 
