@@ -389,10 +389,7 @@
           
           <div class="form-group">
             <label class="form-label" id="label-fecha">Fecha de creación</label>
-            <!-- Input de fecha para CREACIÓN -->
             <input type="date" id="form-fecha" class="form-input" required>
-            <!-- Input de texto para EDICIÓN (Blindado) -->
-            <input type="text" id="form-fecha-text" class="form-input hidden" readonly>
           </div>
           
           <div class="form-group">
@@ -564,77 +561,58 @@
       hideLoading();
     }
 
-    // --- BLINDAJE TOTAL DE FECHAS ---
+    // --- FIX DEFINITIVO PARA LA FECHA ---
     function formatDateClean(dateStr) {
-      if (!dateStr) return "";
+      if (!dateStr) return "-";
       
-      // Si Google Sheets envía un objeto Date serializado (ej. {year: 2023, month: 11, day: 24})
-      if (typeof dateStr === 'object' && !(dateStr instanceof Date)) {
-        if (dateStr.year && dateStr.month && dateStr.day) {
-          let m = String(dateStr.month).padStart(2, '0');
-          let d = String(dateStr.day).padStart(2, '0');
-          return `${dateStr.year}-${m}-${d}`;
+      // Si Google Sheets lo envía como un objeto en lugar de texto
+      if (typeof dateStr === 'object') {
+        if (dateStr instanceof Date) {
+          return dateStr.toISOString().split('T')[0];
         }
-      }
-      
-      if (dateStr instanceof Date) {
-        return dateStr.toISOString().split('T')[0];
+        return "-"; // Si es un objeto vacío {} que no podemos leer
       }
 
+      // Convertir a string por si acaso
       let str = String(dateStr).trim();
-      if (str === "-" || str === "") return "";
 
-      // Formato ISO (2023-11-24T06:00:00.000Z)
+      // Si viene en formato ISO (ej. 2023-11-24T06:00:00.000Z)
       if (str.includes('T')) {
         let d = new Date(str);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-      }
-      
-      // Formato Google Script (Thu Nov 24 2023...)
-      if (str.includes("GMT")) {
-        let d = new Date(str);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0];
+        }
       }
 
-      // Formato con Slash (24/11/2023)
+      // Si viene con la palabra "GMT" (común en Google Apps Script al usar .toString())
+      if (str.includes("GMT")) {
+        let d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          // Ajuste opcional por zona horaria para que no reste un día
+          return d.toISOString().split('T')[0];
+        }
+      }
+
+      // Si viene con slash (ej. 24/11/2023)
       if (str.includes('/')) {
-        let parts = str.split(' ')[0].split('/');
+        let parts = str.split(' ')[0].split('/'); // Tomar solo la fecha, ignorar hora
         if (parts.length === 3) {
+          // Asumimos formato DD/MM/YYYY
           let dia = parts[0].padStart(2, '0');
           let mes = parts[1].padStart(2, '0');
           let anio = parts[2];
-          if (anio.length === 2) anio = "20" + anio;
+          // Si el año tiene 2 dígitos, lo pasamos a 4 (ej. 23 -> 2023)
+          if (anio.length === 2) anio = "20" + anio; 
           return `${anio}-${mes}-${dia}`;
         }
       }
 
-      // Formato con Guion (YYYY-MM-DD)
+      // Si ya viene perfecta (ej. 2023-11-24)
       if (str.includes('-')) {
-        let parts = str.split('T')[0].split(' ')[0].split('-');
-        if (parts.length === 3) {
-          if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-          if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
+        return str.split('T')[0].split(' ')[0];
       }
 
-      return "";
-    }
-
-    function formatDateForDisplay(dateStr) {
-      let clean = formatDateClean(dateStr);
-      if (!clean) return "Sin fecha";
-      
-      let parts = clean.split('-');
-      if (parts.length !== 3) return clean;
-      
-      let anio = parts[0];
-      let mes = parseInt(parts[1], 10);
-      let dia = parseInt(parts[2], 10);
-      
-      const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-      let nombreMes = meses[mes - 1] || parts[1];
-      
-      return `${dia} ${nombreMes} ${anio}`;
+      return str.substring(0, 10); // Intento final
     }
 
     function populateDropdowns() {
@@ -726,13 +704,11 @@
       }
 
       filtered.forEach(l => {
-        // Ahora muestra "24 Nov 2023" o "Sin fecha", nunca un guión
-        let fechaShow = formatDateForDisplay(l.fecha); 
-        
+        let fechaShow = formatDateClean(l.fecha);
         tbody.innerHTML = `
           <tr>
             <td style="font-weight: 500; color: var(--text-secondary);">${l.no}</td>
-            <td style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">${fechaShow}</td>
+            <td style="font-family: monospace; font-size: 12px; color: var(--text-secondary);">${fechaShow}</td>
             <td>
               <div style="font-weight: 600;">${l.empresa || 'Sin empresa'}</div>
               <div style="font-size: 12px; color: var(--text-secondary);">${l.nombre_cliente || ''}</div>
@@ -767,9 +743,7 @@
       currentEditingLead = lead;
       let historial = document.getElementById("form-historial-observaciones");
       let inputFecha = document.getElementById("form-fecha");
-      let inputFechaText = document.getElementById("form-fecha-text");
       let labelFecha = document.getElementById("label-fecha");
-      
       historial.innerHTML = "";
       document.getElementById("form-nuevo-comentario").value = "";
 
@@ -782,15 +756,9 @@
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
         
-        // BLINDAJE: En edición usamos un input de texto seguro
-        let fClean = formatDateClean(lead.fecha);
-        let fDisplay = formatDateForDisplay(lead.fecha);
-        
-        inputFecha.classList.add("hidden");
-        inputFecha.required = false;
-        inputFechaText.classList.remove("hidden");
-        inputFechaText.value = fDisplay;
-        inputFechaText.dataset.raw = fClean; // Guardamos "YYYY-MM-DD" en el dataset
+        // Usar la función de formateo blindada
+        inputFecha.value = formatDateClean(lead.fecha);
+        inputFecha.readOnly = true;
         labelFecha.innerText = "Fecha de creación (Fija)";
 
         const targetEtiqueta = lead.etiqueta || "";
@@ -827,12 +795,8 @@
         document.getElementById("modal-title").innerText = "Registrar Nuevo Lead";
         document.getElementById("lead-form").reset();
         document.getElementById("form-no").value = "";
-        
-        // Modo creación: Mostrar input tipo date normal
-        inputFecha.classList.remove("hidden");
-        inputFecha.required = true;
-        inputFechaText.classList.add("hidden");
         inputFecha.value = new Date().toISOString().split('T')[0];
+        inputFecha.readOnly = false;
         labelFecha.innerText = "Fecha de creación";
 
         document.getElementById("form-estatus").value = "Desarrollo (10%)";
@@ -885,28 +849,14 @@
       const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
       const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
 
-      // BLINDAJE DE ENVÍO DE FECHA
-      let fechaFinal = "";
-      if (currentEditingLead) {
-        // En edición, leer el valor puro del dataset del input de texto
-        fechaFinal = document.getElementById("form-fecha-text").dataset.raw;
-        // Si por lo que sea está vacío, usar el respaldo del lead original
-        if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-          fechaFinal = formatDateClean(currentEditingLead.fecha);
-        }
-      } else {
-        // En creación, leer el input de date
-        fechaFinal = document.getElementById("form-fecha").value;
-      }
-
-      // Si aun así está vacío, usar la fecha actual como último recurso
-      if (!fechaFinal || fechaFinal === "-" || fechaFinal === "") {
-        fechaFinal = new Date().toISOString().split('T')[0];
+      let fechaFinal = document.getElementById("form-fecha").value;
+      if (!fechaFinal && currentEditingLead) {
+        fechaFinal = formatDateClean(currentEditingLead.fecha);
       }
 
       let leadData = {
         no: document.getElementById("form-no").value,
-        fecha: fechaFinal, // <-- Fecha de creación totalmente independiente
+        fecha: fechaFinal, 
         etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
         empresa: document.getElementById("form-empresa").value,
         nombre_cliente: document.getElementById("form-nombre").value,
@@ -918,7 +868,7 @@
         cotizacion: document.getElementById("form-cotizacion").value,
         vendedor: isAdmin ? (selectedVendedor ? selectedVendedor.value : "") : paramVendedor,
         estatus: document.getElementById("form-estatus").value,
-        ultimo_seguimiento: new Date().toISOString().split('T')[0], // <-- Fecha de modificación separada
+        ultimo_seguimiento: new Date().toISOString().split('T')[0],
         monto_mxn: document.getElementById("form-monto-mxn").value,
         monto_usd: document.getElementById("form-monto-usd").value,
         observaciones: observacionesActuales
@@ -955,7 +905,7 @@
       const dayCounts = [0, 0, 0, 0, 0];
       visibleLeads.forEach(l => {
         let clean = formatDateClean(l.fecha);
-        if (clean) {
+        if (clean !== "-") {
           let parts = clean.split('-');
           if (parts.length === 3) {
             let d = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
