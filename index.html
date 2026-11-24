@@ -93,10 +93,48 @@
     }
     .search-input:focus, .select-input:focus { background: var(--surface); border-color: var(--accent); }
 
-    .table-container { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-    th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface-secondary); }
-    td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    /* --- ESTILOS MODIFICADOS PARA SCROLL HORIZONTAL EN TABLA --- */
+    .table-container { 
+      overflow-x: auto; 
+      -webkit-overflow-scrolling: touch; /* Suavidad en iOS */
+      width: 100%;
+      /* Pequeño gradiente en el borde derecho para indicar que hay más contenido */
+      background: linear-gradient(to right, transparent 90%, rgba(0,0,0,0.03));
+    }
+    
+    /* Personalizar la barra de scroll para navegadores Webkit (Chrome, Safari, Edge) */
+    .table-container::-webkit-scrollbar {
+      height: 6px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: var(--surface-secondary);
+      border-radius: 10px;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: var(--text-tertiary);
+      border-radius: 10px;
+    }
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: var(--text-secondary);
+    }
+
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      text-align: left; 
+      font-size: 13px; 
+      min-width: 900px; /* Forzar ancho mínimo para que no se comprima y requiera scroll */
+    }
+    th { 
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
+      color: var(--text-secondary); padding: 10px 12px; border-bottom: 1px solid var(--border); 
+      background: var(--surface-secondary); 
+      white-space: nowrap; /* Evita que los títulos se partan en 2 líneas */
+    }
+    td { 
+      padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); 
+      white-space: nowrap; /* EVITA QUE LOS DATOS SE CORTEN EN 2 RENGLONES */
+    }
     tr:hover td { background: rgba(0,0,0,0.01); }
 
     .pill { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-block; }
@@ -177,7 +215,7 @@
     .form-input:focus { background: var(--surface); border-color: var(--accent); }
     .form-input[readonly] { background: #E5E5EA; color: var(--text-secondary); cursor: not-allowed; }
     
-    /* Estilos para los Radio Buttons (Reemplazo de Selects) */
+    /* Estilos para los Radio Buttons */
     .radio-group {
       display: flex; flex-direction: column; gap: 2px;
       max-height: 140px; overflow-y: auto;
@@ -270,7 +308,7 @@
         <button class="btn-secondary" onclick="clearFilters()">Limpiar</button>
       </div>
 
-      <div class="card">
+      <div class="card" style="padding: 0; overflow: hidden;">
         <div class="table-container">
           <table>
             <thead>
@@ -368,10 +406,10 @@
           
           <div class="form-group">
             <label class="form-label" id="label-fecha">Fecha de creación</label>
+            <!-- Se agregó step="1" y se manejará con JS para no perder el valor -->
             <input type="date" id="form-fecha" class="form-input" required>
           </div>
           
-          <!-- REEMPLAZADO: Select por Radio Buttons -->
           <div class="form-group">
             <label class="form-label">Origen (Etiqueta)</label>
             <div id="form-etiqueta-options" class="radio-group"></div>
@@ -417,7 +455,6 @@
             <input type="text" id="form-cotizacion" class="form-input" placeholder="Folio">
           </div>
 
-          <!-- REEMPLAZADO: Select por Radio Buttons -->
           <div class="form-group">
             <label class="form-label">Vendedor asignado</label>
             <div id="form-vendedor-options" class="radio-group"></div>
@@ -568,7 +605,6 @@
       let vendedores = Array.isArray(listas.vendedores) ? listas.vendedores.filter(v => v != null && String(v).trim() !== "" && v !== "Sin información") : [];
       if (vendedores.length === 0) vendedores = defaultVendedores;
 
-      // Filtro superior de vendedores (Admin)
       if (isAdmin) {
         const fv = document.getElementById("filter-vendedor");
         if (fv) {
@@ -577,7 +613,6 @@
         }
       }
 
-      // --- RENDERIZADO DE RADIO BUTTONS (Origen) ---
       const feOptions = document.getElementById("form-etiqueta-options");
       if (feOptions) {
         feOptions.innerHTML = "";
@@ -591,12 +626,10 @@
         });
       }
 
-      // Solicitud sigue siendo un <select> clásico
       const fs = document.getElementById("form-solicitud");
       fs.innerHTML = "";
       solicitudes.forEach(s => { fs.innerHTML += `<option value="${s}">${s}</option>`; });
 
-      // --- RENDERIZADO DE RADIO BUTTONS (Vendedor) ---
       const fvOptions = document.getElementById("form-vendedor-options");
       if (fvOptions) {
         fvOptions.innerHTML = "";
@@ -688,7 +721,6 @@
       historial.innerHTML = "";
       document.getElementById("form-nuevo-comentario").value = "";
 
-      // Limpiar radios
       document.getElementsByName("etiqueta").forEach(r => r.checked = false);
       if (isAdmin) {
         document.getElementsByName("vendedor").forEach(r => r.checked = false);
@@ -697,11 +729,12 @@
       if (lead) {
         document.getElementById("modal-title").innerText = `Gestionar Lead #${lead.no} - ${lead.empresa}`;
         document.getElementById("form-no").value = lead.no;
+        
+        // FIX: Forzar asignación de la fecha con el formato correcto
         inputFecha.value = formatDateClean(lead.fecha);
         inputFecha.readOnly = true;
         labelFecha.innerText = "Fecha de creación (Fija)";
 
-        // Marcar el radio de la etiqueta correcta
         const targetEtiqueta = lead.etiqueta || "";
         document.getElementsByName("etiqueta").forEach(r => {
           if (r.value === targetEtiqueta) r.checked = true;
@@ -716,7 +749,6 @@
         document.getElementById("form-capacidad").value = lead.capacidad || "";
         document.getElementById("form-cotizacion").value = lead.cotizacion || "";
 
-        // Marcar el radio del vendedor correcto
         const targetVendedor = isAdmin ? (lead.vendedor || "") : paramVendedor;
         document.getElementsByName("vendedor").forEach(r => {
           if (r.value === targetVendedor) r.checked = true;
@@ -744,11 +776,9 @@
         document.getElementById("form-estatus").value = "Desarrollo (10%)";
         historial.innerHTML = `<span style="color:var(--text-secondary);">El historial se creará al guardar.</span>`;
         
-        // Seleccionar el primer origen por defecto
         const etiquetas = document.getElementsByName("etiqueta");
         if (etiquetas.length > 0) etiquetas[0].checked = true;
 
-        // Seleccionar vendedor por defecto
         const vendedores = document.getElementsByName("vendedor");
         if (!isAdmin) {
           vendedores.forEach(r => {
@@ -790,13 +820,18 @@
         observacionesActuales = observacionesActuales ? (observacionesActuales + "\n\n" + entrada) : entrada;
       }
 
-      // Obtener valores de los Radio Buttons
       const selectedEtiqueta = document.querySelector('input[name="etiqueta"]:checked');
       const selectedVendedor = document.querySelector('input[name="vendedor"]:checked');
 
+      // FIX: Obtener la fecha de forma segura y forzar su conservación
+      let fechaFinal = document.getElementById("form-fecha").value;
+      if (!fechaFinal && currentEditingLead) {
+        fechaFinal = formatDateClean(currentEditingLead.fecha);
+      }
+
       let leadData = {
         no: document.getElementById("form-no").value,
-        fecha: document.getElementById("form-fecha").value,
+        fecha: fechaFinal, // <-- Usamos la variable asegurada
         etiqueta: selectedEtiqueta ? selectedEtiqueta.value : "",
         empresa: document.getElementById("form-empresa").value,
         nombre_cliente: document.getElementById("form-nombre").value,
